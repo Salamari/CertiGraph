@@ -35,7 +35,6 @@ CONFIGURE
 CoqMakefile
 CoqMakefile.conf
 \#*\#
-_CoqProject
 final
 poster.run.xml
 project.pbxproj
