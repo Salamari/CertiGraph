@@ -18,7 +18,6 @@ install: [
 ]
 depends: [
     "coq" {>= "8.19.0" & < "8.20~"}
-    "coq-compcert" {= "3.13.1"}
     "coq-vst" {= "2.14"}
 ]
 synopsis: "A library for verifying graph-manipulating programs"
