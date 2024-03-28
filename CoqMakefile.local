@@ -1,0 +1,100 @@
+CLIGHTGEN ?= clightgen
+CLG_FLAGS = -normalize -DCOMPCERT
+
+default: certigraph
+
+all: certigraph certigc applications
+
+certigraph:  graph/spanning_tree.vo graph/dag.vo graph/marked_graph.vo graph/local_graph_copy.vo graph/tree_model.vo graph/list_model.vo graph/BinGraph.vo \
+             graph/GraphAsList.vo graph/graph_isomorphism.vo graph/undirected_uf_lemmas.vo graph/SpaceAdjMatGraph1.vo graph/path_cost.vo \
+             graph/SpaceUAdjMatGraph1.vo graph/SpaceUAdjMatGraph2.vo graph/SpaceUAdjMatGraph3.vo graph/SpaceEdgeLabelGraph.vo
+
+certigc: CertiGC/gc_correct.vo CertiGC/verif_conversion.vo CertiGC/verif_Is_from.vo CertiGC/gc_spec.vo CertiGC/verif_create_space.vo \
+         CertiGC/verif_create_heap.vo CertiGC/verif_make_tinfo.vo CertiGC/env_graph_gc.vo CertiGC/verif_is_ptr.vo CertiGC/verif_garbage_collect.vo \
+         CertiGC/verif_resume.vo CertiGC/GCGraph.vo CertiGC/verif_forward.vo CertiGC/verif_do_scan.vo CertiGC/verif_forward_roots.vo \
+         CertiGC/verif_do_generation.vo
+
+applications: binheap/verif_binary_heap.vo binheap/verif_binary_heap_pro.vo mark/verif_mark_bin.vo mark/verif_mark_bin_dag.vo \
+            summatrix/verif_summatrix.vo copy/verif_copy_bin.vo dispose/verif_dispose_bin.vo \
+	    unionfind/verif_unionfind.vo unionfind/verif_unionfind_slim.vo unionfind/verif_unionfind_rank.vo \
+            unionfind/verif_unionfind_iter.vo unionfind/verif_unionfind_iter_rank.vo unionfind/verif_unionfind_arr.vo \
+	    kruskal/verif_sort.vo kruskal/verif_kruskal_edgelist.vo \
+	    prim/verif_prim1.vo prim/verif_prim2.vo prim/verif_prim3.vo prim/verif_noroot_prim.vo \
+	    dijkstra/verif_dijkstra1.vo dijkstra/verif_dijkstra2.vo dijkstra/verif_dijkstra3.vo \
+	    priq/verif_priq_arr.vo append/verif_append.vo
+
+CertiGC/GC_source/printm: CertiGC/GC_source/printm.c
+	`dirname $(CLIGHTGEN)`/ccomp $< -o $@
+
+CertiGC/GC_source/m.h: CertiGC/GC_source/printm
+	CertiGC/GC_source/printm > $@
+
+CertiGC/gc_stack.v: CertiGC/GC_source/gc_stack.c CertiGC/GC_Source/config.h CertiGC/GC_Source/gc_stack.h CertiGC/GC_Source/mem.h CertiGC/GC_Source/values.h
+#	$(CLIGHTGEN) $(CLG_FLAGS) -DVERIFFI -isystem `dirname $<` $< -o $@
+	$(CLIGHTGEN) $(CLG_FLAGS) -DVERIFFI $< -o $@
+
+summatrix/summatrix.v: summatrix/summatrix.c
+	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
+
+kruskal/kruskal_edgelist.v: kruskal/kruskal_edgelist.c unionfind/unionfind_arr.h
+	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
+
+unionfind/unionfind.v: unionfind/unionfind.c
+	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
+	
+unionfind/unionfind_iter.v: unionfind/unionfind_iter.c
+	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
+
+unionfind/unionfind_arr.v: unionfind/unionfind_arr.c unionfind/unionfind_arr.h
+	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
+
+append/append.v: append/append.c
+	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
+
+mark/mark_bin.v: mark/mark_bin.c
+	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
+
+binheap/binary_heap_pro.v: binheap/binary_heap_pro.c binheap/binary_heap_pro.h
+	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
+
+binheap/binary_heap.v: binheap/binary_heap.c binheap/binary_heap.h
+	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
+
+prim/noroot_prim.v: prim/noroot_prim.c priq/priq_arr.h
+	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
+
+prim/prim1.v: prim/prim1.c priq/priq_arr.h
+	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
+
+prim/prim2.v: prim/prim2.c priq/priq_arr.h
+	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
+
+prim/prim3.v: prim/prim3.c priq/priq_arr.h
+	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
+
+priq/priq_arr.v: priq/priq_arr.c priq/priq_arr.h
+	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
+
+dispose/dispose_bin.v: dispose/dispose_bin.c
+	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
+
+copy/copy_bin.v: copy/copy_bin.c
+	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
+
+dijkstra/dijkstra1.v: dijkstra/dijkstra1.c binheap/binary_heap_pro.h
+	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
+
+dijkstra/dijkstra2.v: dijkstra/dijkstra2.c binheap/binary_heap_pro.h
+	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
+
+dijkstra/dijkstra3.v: dijkstra/dijkstra3.c binheap/binary_heap_pro.h
+	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
+
+clean::
+#	rm -f CoqMakefile CoqMakefile.conf
+#	rm -f */{*.vo,*.vos,*.vok,*.glob} 
+	rm -f CertiGC/gc_stack.v summatrix/summatrix.v kruskal/kruskal_edgelist.v \
+              unionfind/unionfind.v unionfind/unionfind_iter.v unionfind/unionfind_arr.v \
+              append/append.v mark/mark_bin.v binheap/binary_heap_pro.v binheap/binary_heap.v \
+              prim/noroot_prim.v prim/prim1.v prim/prim2.v prim/prim3.v priq/priq_arr.v \
+              dispose/dispose_bin.v copy/copy_bin.v dijkstra/dijkstra1.v dijkstra/dijkstra2.v dijkstra/dijkstra3.v 

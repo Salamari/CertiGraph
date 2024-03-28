@@ -3448,7 +3448,7 @@ Proof.
   simpl in Hh. subst v'. exists (vmap12 s). split.
   1: subst roots2; rewrite <- filter_sum_right_In_iff in Hin |- * ; rewrite in_map_iff;
   exists (inr s); split; auto. clear Hr2. destruct Hr1 as [_ Hr1].
-  revert dependent v0. induction p using rev_ind; intros.
+  generalize dependent v0. induction p using rev_ind; intros.
   - simpl in Hf. subst v0. apply reachable_refl. assumption.
   - assert (valid_path g1 (s, p)) as Hvp1. {
       rewrite valid_path_app in Hvp. destruct Hvp; assumption. }
