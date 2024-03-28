@@ -1,6 +1,6 @@
 opam-version: "2.0"
 name: "CertiGraph"
-version: "1.0"
+version: "1.1"
 maintainer: "CertiGraph team"
 homepage: "https://github.com/CertiGraph/CertiGraph"
 dev-repo: "git+https://github.com/CertiGraphCertiGraph.git"
@@ -11,11 +11,10 @@ authors: ["Aquinas Hobor"
     "Anshuman Mohan"
 ]
 build: [
-    [make "BITSIZE=64" "depend"]
-    [make "BITSIZE=64" "-j%{jobs}%"]
+    [make "-j%{jobs}%"]
 ]
 install: [
-    make "BITSIZE=64" "install"
+    make "install"
 ]
 depends: [
     "coq" {>= "8.19.0" & < "8.20~"}
