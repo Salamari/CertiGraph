@@ -11,7 +11,7 @@ authors: ["Aquinas Hobor"
     "Anshuman Mohan"
 ]
 build: [
-    make "-j%{jobs}%" "certigraph"
+    make "-j%{jobs}%"
 ]
 install: [
     make "install"
