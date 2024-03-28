@@ -23,70 +23,90 @@ applications: binheap/verif_binary_heap.vo binheap/verif_binary_heap_pro.vo mark
 	    dijkstra/verif_dijkstra1.vo dijkstra/verif_dijkstra2.vo dijkstra/verif_dijkstra3.vo \
 	    priq/verif_priq_arr.vo append/verif_append.vo
 
-CertiGC/GC_source/printm: CertiGC/GC_source/printm.c
+CertiGC/GC_Source/printm: CertiGC/GC_Source/printm.c
 	`dirname $(CLIGHTGEN)`/ccomp $< -o $@
 
-CertiGC/GC_source/m.h: CertiGC/GC_source/printm
-	CertiGC/GC_source/printm > $@
+CertiGC/GC_Source/m.h: CertiGC/GC_Source/printm
+	CertiGC/GC_Source/printm > $@
 
-CertiGC/gc_stack.v: CertiGC/GC_source/gc_stack.c CertiGC/GC_Source/config.h CertiGC/GC_Source/gc_stack.h CertiGC/GC_Source/mem.h CertiGC/GC_Source/values.h
+GENERATED_FILES += CertiGC/gc_stack.v
+CertiGC/gc_stack.v: CertiGC/GC_Source/gc_stack.c CertiGC/GC_Source/config.h CertiGC/GC_Source/gc_stack.h CertiGC/GC_Source/mem.h CertiGC/GC_Source/values.h CertiGC/GC_Source/m.h
 #	$(CLIGHTGEN) $(CLG_FLAGS) -DVERIFFI -isystem `dirname $<` $< -o $@
 	$(CLIGHTGEN) $(CLG_FLAGS) -DVERIFFI $< -o $@
 
+GENERATED_FILES += summatrix/summatrix.v
 summatrix/summatrix.v: summatrix/summatrix.c
 	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
 
+GENERATED_FILES += kruskal/kruskal_edgelist.v
 kruskal/kruskal_edgelist.v: kruskal/kruskal_edgelist.c unionfind/unionfind_arr.h
 	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
 
+GENERATED_FILES += unionfind/unionfind.v
 unionfind/unionfind.v: unionfind/unionfind.c
 	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
 	
+GENERATED_FILES += unionfind/unionfind_iter.v
 unionfind/unionfind_iter.v: unionfind/unionfind_iter.c
 	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
 
+GENERATED_FILES += unionfind/unionfind_arr.v
 unionfind/unionfind_arr.v: unionfind/unionfind_arr.c unionfind/unionfind_arr.h
 	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
 
+GENERATED_FILES += append/append.v
 append/append.v: append/append.c
 	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
 
+GENERATED_FILES += mark/mark_bin.v
 mark/mark_bin.v: mark/mark_bin.c
 	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
 
+GENERATED_FILES += binheap/binary_heap_pro.v
 binheap/binary_heap_pro.v: binheap/binary_heap_pro.c binheap/binary_heap_pro.h
 	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
 
+GENERATED_FILES += binheap/binary_heap.v
 binheap/binary_heap.v: binheap/binary_heap.c binheap/binary_heap.h
 	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
 
+GENERATED_FILES += prim/noroot_prim.v
 prim/noroot_prim.v: prim/noroot_prim.c priq/priq_arr.h
 	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
 
+GENERATED_FILES += prim/prim1.v
 prim/prim1.v: prim/prim1.c priq/priq_arr.h
 	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
 
+GENERATED_FILES += prim/prim2.v
 prim/prim2.v: prim/prim2.c priq/priq_arr.h
 	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
 
+GENERATED_FILES += prim/prim3.v
 prim/prim3.v: prim/prim3.c priq/priq_arr.h
 	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
 
+GENERATED_FILES += priq/priq_arr.v
 priq/priq_arr.v: priq/priq_arr.c priq/priq_arr.h
 	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
 
+GENERATED_FILES += dispose/dispose_bin.v
 dispose/dispose_bin.v: dispose/dispose_bin.c
 	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
 
+GENERATED_FILES += copy/copy_bin.v
 copy/copy_bin.v: copy/copy_bin.c
 	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
 
+GENERATED_FILES += dijkstra/dijkstra1.v
 dijkstra/dijkstra1.v: dijkstra/dijkstra1.c binheap/binary_heap_pro.h
 	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
 
+GENERATED_FILES += dijkstra/dijkstra2.v
 dijkstra/dijkstra2.v: dijkstra/dijkstra2.c binheap/binary_heap_pro.h
 	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
 
+GENERATED_FILES += dijkstra/dijkstra3.v
 dijkstra/dijkstra3.v: dijkstra/dijkstra3.c binheap/binary_heap_pro.h
 	$(CLIGHTGEN) $(CLG_FLAGS) $< -o $@
 
