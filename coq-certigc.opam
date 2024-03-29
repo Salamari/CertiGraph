@@ -1,18 +1,17 @@
 opam-version: "2.0"
-name: "CertiGraph"
+name: "CertiGC"
 version: "1.1"
 maintainer: "CertiGraph team"
 homepage: "https://github.com/CertiGraph/CertiGraph"
 dev-repo: "git+https://github.com/CertiGraphCertiGraph.git"
 bug-reports: "https://github.com/CertiGraphCertiGraph/issues"
 license: "https://github.com/CertiGraphCertiGraph/blob/live/LICENSE"
-authors: ["Aquinas Hobor"
+authors: [ 
     "Shengyi Wang"
-    "Anshuman Mohan"
     "Andrew W. Appel"
 ]
 build: [
-    make "-j%{jobs}%"
+    make "-j%{jobs}%" certigraph certigc
 ]
 install: [
     make "install"
@@ -20,8 +19,9 @@ install: [
 depends: [
     "coq" {>= "8.19.0" & < "8.20~"}
     "coq-vst" {= "2.14"}
+    "coq-certigraph" {= version}
 ]
-synopsis: "A library for verifying graph-manipulating programs"
+synopsis: "Verified generational garbage collector for CertiCoq"
 description: """
-CertiGraph is a library for verifying graph-manipulating programs.
+Generational garbage collector for CertiCoq, written in C, verified with VST using the CertiGraph library.
 """
