@@ -11,7 +11,7 @@ authors: [
     "Andrew W. Appel"
 ]
 build: [
-    make "-j%{jobs}%" "certigraph" "certigc"
+    make "-j%{jobs}%" "certigc"
 ]
 install: [
     make "install"
