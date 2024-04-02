@@ -27,13 +27,14 @@ syntax: glob
 .DS_Store
 .Makefile.coq.d
 .\#*
-.depend
+.CoqMakefile.d
 .lia.cache
+.nia.cache
+.vscode
 CONFIGURE
-Makefile.coq
-Makefile.coq.conf
+CoqMakefile
+CoqMakefile.conf
 \#*\#
-_CoqProject
 final
 poster.run.xml
 project.pbxproj
@@ -44,8 +45,9 @@ CertiGC/gc.h
 CertiGC/m.h
 CertiGC/mem.h
 CertiGC/values.h
-CertiGC/gc.v
-CertiGC/GC\ Source/printm
+CertiGC/gc_stack.v
+CertiGC/GC_Source/printm
+CertiGC/GC_Source/m.h
 append/append.v
 binheap/binary_heap.v
 binheap/binary_heap_pro.v
