@@ -28,7 +28,7 @@ Definition is_string_constant (d: ident * globdef Clight.fundef type) : bool :=
 
 Definition sep_of_string_constant sh gv (d: ident * globdef Clight.fundef type) : mpred :=
   match d with
-  | (i, Gvar v) => cstring sh (map init_data2byte (gvar_init v)) (gv i)
+  | (i, Gvar v) => cstring sh (map init_data2byte (sublist 0 (Zlength (gvar_init v)-1) (gvar_init v))) (gv i)
   | _ => emp
   end.
 
@@ -71,46 +71,6 @@ Definition abort_with_spec :=
     SEP (cstring sh str s)
   POST [ tvoid ]
     PROP (False) RETURN() SEP().
-
-Definition IS_FROM_TYPE :=
-  ProdType (ProdType (ProdType
-                        (ProdType (ConstType share) (ConstType val))
-                        (ConstType Z)) (ConstType val)) Mpred.
-
-Program Definition Is_from_spec :=
-  DECLARE _Is_from
-  TYPE IS_FROM_TYPE
-  WITH sh: share, start : val, n: Z, v: val, P: mpred
-  PRE [tptr int_or_ptr_type,
-       tptr int_or_ptr_type,
-       tptr int_or_ptr_type]
-    PROP ()
-    PARAMS (start; offset_val n start; v)
-    GLOBALS ()
-    SEP (weak_derives P (memory_block sh n start * TT) && emp;
-         weak_derives P (valid_pointer v * TT) && emp; P)
-  POST [tint]
-    EX b: {v_in_range v start n} + {~ v_in_range v start n},
-    PROP ()
-    RETURN (Vint (Int.repr (if b then 1 else 0)))
-    SEP (P).
-Next Obligation.
-Proof.
-  repeat intro.
-  destruct x as ((((?, ?), ?), ?), ?); simpl.
-  unfold PROPx, LAMBDAx, GLOBALSx, LOCALx, SEPx, argsassert2assert; simpl;
-    rewrite !approx_andp; f_equal; f_equal.
-  rewrite !sepcon_emp, ?approx_sepcon, ?approx_idem, ?approx_andp.
-  f_equal; f_equal; [|f_equal]; now rewrite derives_nonexpansive_l.
-Qed.
-Next Obligation.
-Proof.
-  repeat intro.
-  destruct x as ((((?, ?), ?), ?), ?); simpl.
-  rewrite !approx_exp. apply f_equal; extensionality t.
-  unfold PROPx, LOCALx, SEPx; simpl; rewrite !approx_andp; f_equal; f_equal.
-  rewrite !sepcon_emp, approx_idem. reflexivity.
-Qed.
 
 Definition forward_spec :=
   DECLARE _forward
@@ -422,7 +382,6 @@ Definition free_heap_spec :=
 *)
 Definition GC_Internal : funspecs :=
                      [is_ptr_spec;
-                      Is_from_spec;
                       abort_with_spec;
                       forward_spec;
                       forward_roots_spec;
@@ -433,15 +392,27 @@ Definition GC_Internal : funspecs :=
                       create_heap_spec;
                       make_tinfo_spec;
                       resume_spec;
-                      garbage_collect_spec].
+                      garbage_collect_spec;
+                      (_garbage_collect_all, vacuous_funspec (Internal f_garbage_collect_all));
+                      (_certicoq_modify, vacuous_funspec (Internal f_certicoq_modify));
+                      (_export_heap, vacuous_funspec (Internal f_export_heap));
+                      (_print_heapsize, vacuous_funspec (Internal f_print_heapsize));
+                      (_reset_heap, vacuous_funspec (Internal f_reset_heap));
+                      (_free_heap, vacuous_funspec (Internal f_free_heap))
+                       ].
 
 Definition GC_ASI : funspecs := 
                      [ garbage_collect_spec].
 
-Definition Gprog: funspecs :=
-                     spec_malloc.MallocASI ++ 
+Definition Boxing_subset := 
                      [spec_boxing.test_int_or_ptr_spec; 
                       spec_boxing.int_or_ptr_to_ptr_spec;
-                      spec_boxing.ptr_to_int_or_ptr_spec] ++ 
-                     GC_Internal.
+                      spec_boxing.ptr_to_int_or_ptr_spec;
+                      spec_boxing.ptr_in_range_spec].
+
+
+Definition GC_imported_specs:funspecs := 
+  MallocASI ++ Boxing_subset.
+
+Definition Gprog: funspecs := GC_imported_specs ++ GC_Internal.
 

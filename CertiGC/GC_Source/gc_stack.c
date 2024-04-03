@@ -130,12 +130,6 @@ void abort_with(char *s) {
   exit(1);
 }
 
-int Is_from(value* from_start, value * from_limit,  value * v) {
-    return (from_start <= v && v < from_limit);
-}
-/* Assuming v is a pointer (is_ptr(v)), tests whether v points
-   somewhere into the "from-space" defined by from_start and from_limit */
-
 void forward (value *from_start,  /* beginning of from-space */
 	      value *from_limit,  /* end of from-space */
 	      value **next,       /* next available spot in to-space */
@@ -158,7 +152,7 @@ void forward (value *from_start,  /* beginning of from-space */
     v = (value*)int_or_ptr_to_ptr(va);
     /* printf("Start: %lld end"" %lld word %lld \n", from_start, from_limit, v); */
     /* if  (v == 4360698480) printf ("Found it\n"); */
-    if(Is_from(from_start, from_limit, v)) {
+    if(ptr_in_range(from_start, from_limit, v)) {
       /* printf("Moving\n"); */
       header_t hd = Hd_val(v);
       if(hd == 0) { /* already forwarded */

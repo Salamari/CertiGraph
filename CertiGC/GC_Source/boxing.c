@@ -24,3 +24,9 @@ value int_to_int_or_ptr(intnat x) /* precondition: is odd */ {
 value ptr_to_int_or_ptr(void *x) /* precondition: is aligned */ {
     return (value)x;
 }
+
+int ptr_in_range(value* start, value * limit,  value * v) {
+  /* Assuming v is a pointer (is_ptr(v)), tests whether v points
+    somewhere into the space defined by start and limit */
+    return (start <= v && v < limit);
+}

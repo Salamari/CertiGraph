@@ -74,9 +74,55 @@ Definition ptr_to_int_or_ptr_spec :=
   POST [ int_or_ptr_type ]
     PROP() RETURN (x) SEP().
 
+Import rmaps.
+
+Definition PTR_IN_RANGE_TYPE :=
+  ProdType (ProdType (ProdType
+                        (ProdType (ConstType share) (ConstType val))
+                        (ConstType Z)) (ConstType val)) Mpred.
+
+From CertiGraph.CertiGC Require Import GCGraph spatial_gcgraph.  (* for weak_derives *)
+
+Program Definition ptr_in_range_spec :=
+  DECLARE _ptr_in_range
+  TYPE PTR_IN_RANGE_TYPE
+  WITH sh: share, start : val, n: Z, v: val, P: mpred
+  PRE [tptr int_or_ptr_type,
+       tptr int_or_ptr_type,
+       tptr int_or_ptr_type]
+    PROP ()
+    PARAMS (start; offset_val n start; v)
+    GLOBALS ()
+    SEP (weak_derives P (memory_block sh n start * TT) && emp;
+         weak_derives P (valid_pointer v * TT) && emp; P)
+  POST [tint]
+    EX b: {v_in_range v start n} + {~ v_in_range v start n},
+    PROP ()
+    RETURN (Vint (Int.repr (if b then 1 else 0)))
+    SEP (P).
+Next Obligation.
+Proof.
+  repeat intro.
+  destruct x as ((((?, ?), ?), ?), ?); simpl.
+  unfold PROPx, LAMBDAx, GLOBALSx, LOCALx, SEPx, argsassert2assert; simpl;
+    rewrite !approx_andp; f_equal; f_equal.
+  rewrite !sepcon_emp, ?approx_sepcon, ?approx_idem, ?approx_andp.
+  f_equal; f_equal; [|f_equal]; now rewrite derives_nonexpansive_l.
+Qed.
+Next Obligation.
+Proof.
+  repeat intro.
+  destruct x as ((((?, ?), ?), ?), ?); simpl.
+  rewrite !approx_exp. apply f_equal; extensionality t.
+  unfold PROPx, LOCALx, SEPx; simpl; rewrite !approx_andp; f_equal; f_equal.
+  rewrite !sepcon_emp, approx_idem. reflexivity.
+Qed.
+
+
 Definition Gprog: funspecs :=
                      [test_int_or_ptr_spec;
                       int_or_ptr_to_int_spec;
                       int_or_ptr_to_ptr_spec;
                       int_to_int_or_ptr_spec;
-                      ptr_to_int_or_ptr_spec].
+                      ptr_to_int_or_ptr_spec;
+                      ptr_in_range_spec].

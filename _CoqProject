@@ -122,6 +122,7 @@ unionfind/verif_unionfind_iter_rank.v
 unionfind/verif_unionfind_arr.v
 
 
+CertiGC/link.v
 CertiGC/gc_stack.v 
 CertiGC/boxing.v 
 CertiGC/data_at_test.v
