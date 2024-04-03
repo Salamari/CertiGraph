@@ -9,6 +9,7 @@ KNOWNFILES   := Makefile _CoqProject
 .DEFAULT_GOAL := invoke-coqmakefile
 
 CoqMakefile: Makefile _CoqProject
+	bash opam-require coq-vst.2.14 coq-vst-lib.2.14
 	$(COQBIN)coq_makefile -f _CoqProject -o CoqMakefile
 
 invoke-coqmakefile: CoqMakefile

@@ -1,4 +1,4 @@
-From CertiGraph.CertiGC Require Import env_graph_gc gc_spec.
+From CertiGraph.CertiGC Require Import env_graph_gc spec_gc.
 Require Import CertiGraph.msl_ext.ramification_lemmas.
 Require Import VST.concurrency.conclib.
 Import graph_model List_ext.

@@ -10,6 +10,11 @@ Require Import CertiGraph.CertiGC.GCGraph.
 Require Import CertiGraph.CertiGC.env_graph_gc.
 Require Import CertiGraph.msl_ext.iter_sepcon.
 Require Import Coq.Lists.List.
+Require Import VSTlib.spec_malloc.
+Require VSTlib.verif_malloc.
+
+#[export] Existing Instance VSTlib.verif_malloc.M.
+
 
 Local Open Scope logic.
 

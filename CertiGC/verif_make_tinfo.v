@@ -1,11 +1,11 @@
-From CertiGraph.CertiGC Require Import env_graph_gc gc_spec.
+From CertiGraph.CertiGC Require Import env_graph_gc spec_gc.
 
 Lemma body_make_tinfo: semax_body Vprog Gprog f_make_tinfo make_tinfo_spec.
 Proof.
   start_function.
   forward_call (sh, gv).
   Intros vret. destruct vret as [h p]. simpl fst. simpl snd.
-  forward_call (thread_info_type, gv).
+  forward_call (spec_malloc.malloc_spec_sub thread_info_type) gv.
   Intros t. if_tac.
   - subst t. forward_if False; [ | congruence].
     unfold all_string_constants; Intros; forward_call; contradiction.

@@ -5,7 +5,8 @@ Require Export CertiGraph.CertiGC.GCGraph.
 Require Export CertiGraph.CertiGC.spatial_gcgraph.
 Require Import CertiGraph.CertiGC.env_graph_gc.
 Require Import CertiGraph.msl_ext.iter_sepcon.
-
+Require CertiGraph.CertiGC.spec_boxing.
+Export spec_malloc.
 Local Open Scope logic.
 
 Identity Coercion LGraph_LabeledGraph: LGraph >-> LabeledGraph.
@@ -43,66 +44,6 @@ Definition all_string_constants (sh: share) (gv: globals) : mpred :=
    let x := eval unfold sep_of_string_constant in x in
    match x with ?S ?A ?B => exact (sepcon A B) end).
 
-Definition test_int_or_ptr_spec :=
- DECLARE _test_int_or_ptr
- WITH x : val
- PRE [int_or_ptr_type]
-   PROP (valid_int_or_ptr x)
-   PARAMS (x)
-   GLOBALS ()
-   SEP ()
- POST [ tint ]
-   PROP()
-   RETURN(Vint (Int.repr (match x with
-                           | Vint _ => if Archi.ptr64 then 0 else 1
-                           | Vlong _ => if Archi.ptr64 then 1 else 0
-                           | _ => 0
-                           end)))
-   SEP().
-
-Definition int_or_ptr_to_int_spec :=
-  DECLARE _int_or_ptr_to_int
-  WITH x : val
-  PRE [int_or_ptr_type ]
-    PROP (is_int I32 Signed x)
-    PARAMS (x)
-    GLOBALS ()
-    SEP ()
-  POST [ (if Archi.ptr64 then tlong else tint) ]
-    PROP() RETURN (x) SEP().
-
-Definition int_or_ptr_to_ptr_spec :=
-  DECLARE _int_or_ptr_to_ptr
-  WITH x : val
-  PRE [int_or_ptr_type ]
-    PROP (isptr x)
-    PARAMS (x)
-    GLOBALS ()
-    SEP ()
-  POST [ tptr tvoid ]
-    PROP() RETURN (x) SEP().
-
-Definition int_to_int_or_ptr_spec :=
-  DECLARE _int_to_int_or_ptr
-  WITH x : val
-  PRE [ (if Archi.ptr64 then tlong else tint) ]
-    PROP (valid_int_or_ptr x)
-    PARAMS (x)
-    GLOBALS ()
-    SEP ()
-  POST [ int_or_ptr_type ]
-    PROP() RETURN (x) SEP().
-
-Definition ptr_to_int_or_ptr_spec :=
-  DECLARE _ptr_to_int_or_ptr
-  WITH x : val
-  PRE [tptr tvoid ]
-    PROP (valid_int_or_ptr x)
-    PARAMS (x)
-    GLOBALS ()
-    SEP()
-  POST [ int_or_ptr_type ]
-    PROP() RETURN (x) SEP().
 
 Definition is_ptr_spec :=
   DECLARE _is_ptr
@@ -479,15 +420,8 @@ Definition free_heap_spec :=
   PROP () RETURN () 
   SEP (mem_mgr gv; all_string_constants rsh gv).
 *)
-
-Definition Gprog: funspecs :=
-  ltac:(with_library prog
-                     [test_int_or_ptr_spec;
-                      int_or_ptr_to_int_spec;
-                      int_or_ptr_to_ptr_spec;
-                      int_to_int_or_ptr_spec;
-                      ptr_to_int_or_ptr_spec;
-                      is_ptr_spec;
+Definition GC_Internal : funspecs :=
+                     [is_ptr_spec;
                       Is_from_spec;
                       abort_with_spec;
                       forward_spec;
@@ -499,4 +433,15 @@ Definition Gprog: funspecs :=
                       create_heap_spec;
                       make_tinfo_spec;
                       resume_spec;
-                      garbage_collect_spec]).
+                      garbage_collect_spec].
+
+Definition GC_ASI : funspecs := 
+                     [ garbage_collect_spec].
+
+Definition Gprog: funspecs :=
+                     spec_malloc.MallocASI ++ 
+                     [spec_boxing.test_int_or_ptr_spec; 
+                      spec_boxing.int_or_ptr_to_ptr_spec;
+                      spec_boxing.ptr_to_int_or_ptr_spec] ++ 
+                     GC_Internal.
+
