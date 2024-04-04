@@ -125,11 +125,6 @@ void printtree(FILE *f, struct heap *h, value v) {
 
 #endif
 
-void abort_with(char *s) {
-  fprintf(stderr, "%s", s);
-  exit(1);
-}
-
 void forward (value *from_start,  /* beginning of from-space */
 	      value *from_limit,  /* end of from-space */
 	      value **next,       /* next available spot in to-space */

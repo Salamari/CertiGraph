@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include "boxing.h"
 
 /* The following 5 functions should (in practice) compile correctly in CompCert,
@@ -29,4 +30,9 @@ int ptr_in_range(value* start, value * limit,  value * v) {
   /* Assuming v is a pointer (is_ptr(v)), tests whether v points
     somewhere into the space defined by start and limit */
     return (start <= v && v < limit);
+}
+
+void abort_with(char *s) {
+  fputs (s, stderr);
+  exit(1);
 }

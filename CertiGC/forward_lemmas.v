@@ -6,6 +6,45 @@ Import graph_model List_ext.
 Local Open Scope logic.
 
 
+Lemma change_compspecs_cstring: forall cs1 cs2: compspecs, (* put this in Floyd *)
+    @cstring cs1 = @cstring cs2.
+Proof.
+intros.
+extensionality sh s p.
+unfold cstring.
+f_equal.
+set (u := map _ _). clearbody u.
+set (n := Zlength _ + _). clearbody n.
+unfold data_at.
+unfold field_at.
+f_equal.
+f_equal.
+unfold field_compatible.
+f_equal; auto.
+f_equal; auto.
+f_equal; auto.
+f_equal; auto.
+unfold align_compatible.
+destruct p; simpl; auto.
+apply prop_ext; split; intro;
+(apply align_compatible_rec_Tarray; intros j ?;
+ apply align_compatible_rec_Tarray_inv with (i:=j) in H; auto;
+ inv H; econstructor; eauto).
+Qed.
+
+Ltac forward.change_compspecs cs ::=
+    (* remove this when issue #764 is fixed, perhaps in VST 2.15 *)
+  match goal with
+  | |- context [ ?cs' ] =>
+        match type of cs' with
+        | compspecs =>
+            try (constr_eq cs cs'; fail 1); 
+            first [rewrite !(change_compspecs_cstring cs' cs)
+                  | change_compspecs' cs' cs];
+            repeat change_compspecs' cs cs'
+        end
+  end.
+
 Ltac solve_store_rule_evaluation ::= 
  (* remove this when issue #[732??] is fixed, perhaps in VST 2.14 *)
   match goal with |- @upd_reptype ?cs ?t ?gfs ?v0 ?v1 = ?B =>

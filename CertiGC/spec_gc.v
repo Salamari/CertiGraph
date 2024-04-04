@@ -61,17 +61,6 @@ Definition is_ptr_spec :=
                                 end)))
     SEP().
 
-Definition abort_with_spec :=
-  DECLARE _abort_with
-  WITH s: val, str: list byte, sh: share
-  PRE [tptr tschar]
-    PROP (readable_share sh)
-    PARAMS (s)
-    GLOBALS ()
-    SEP (cstring sh str s)
-  POST [ tvoid ]
-    PROP (False) RETURN() SEP().
-
 Definition forward_spec :=
   DECLARE _forward
   WITH rsh: share, sh: share, gv: globals,
@@ -382,7 +371,6 @@ Definition free_heap_spec :=
 *)
 Definition GC_Internal : funspecs :=
                      [is_ptr_spec;
-                      abort_with_spec;
                       forward_spec;
                       forward_roots_spec;
                       forward_remset_spec;
@@ -408,7 +396,8 @@ Definition Boxing_subset :=
                      [spec_boxing.test_int_or_ptr_spec; 
                       spec_boxing.int_or_ptr_to_ptr_spec;
                       spec_boxing.ptr_to_int_or_ptr_spec;
-                      spec_boxing.ptr_in_range_spec].
+                      spec_boxing.ptr_in_range_spec;
+                      spec_boxing.abort_with_spec].
 
 
 Definition GC_imported_specs:funspecs := 

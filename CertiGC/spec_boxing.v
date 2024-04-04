@@ -119,10 +119,22 @@ Proof.
 Qed.
 
 
+Definition abort_with_spec :=
+  DECLARE _abort_with
+  WITH s: val, str: list byte, sh: share
+  PRE [tptr tschar]
+    PROP (readable_share sh)
+    PARAMS (s)
+    GLOBALS ()
+    SEP (cstring sh str s)
+  POST [ tvoid ]
+    PROP (False) RETURN() SEP().
+
 Definition Gprog: funspecs :=
                      [test_int_or_ptr_spec;
                       int_or_ptr_to_int_spec;
                       int_or_ptr_to_ptr_spec;
                       int_to_int_or_ptr_spec;
                       ptr_to_int_or_ptr_spec;
-                      ptr_in_range_spec].
+                      ptr_in_range_spec;
+                      abort_with_spec].
