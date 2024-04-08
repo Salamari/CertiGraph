@@ -197,7 +197,7 @@ Proof.
   simpl. reflexivity.
 Qed.
 
-(** BEGIN Things to go into vst/floyd/VSU.v *)
+(** BEGIN can be removed with VST 2.15 *)
 
 Lemma init_data_tarray_tuchar: (* move this to vst/floyd/globals_lemmas.v *)
   forall {cs : compspecs} sh (gv : globals) (b : block) (xs : list int) (i : ptrofs),
@@ -353,31 +353,7 @@ Qed.
 
 Require Import VST.floyd.VSU.
 
-Lemma match_globals: 
-  forall gv : globals,
-  InitGPred (Vardefs (QPprog gc_stack.prog) ) gv |-- all_string_constants Ers gv.
-Proof.
-intros.
-unfold all_string_constants.
-repeat match goal with |- context [gv ?i] => progress (unfold i) end.
-set (j := Vardefs _); hnf in j; simpl in j; subst j.
-cbv [InitGPred fold_right map Maps.PTree.prev Maps.PTree.prev_append
-     globs2pred].
-Intros.
-rewrite !sepcon_assoc.
-apply sepcon_derives.
-apply derives_refl.
-repeat
-match goal with |- context [globvar2pred ?gv (?i, ?v)] =>
-  sep_apply (globvar2pred_cstring gv i v); [compute; split; reflexivity | ]
-end.
-clear.
-simpl.
-cancel.
-Qed.
-
-
-Ltac SF_vacuous ::= (* update vst/floyd/VSU.v with this new definition *)
+Ltac SF_vacuous ::= (* can be removed with VST 2.15 *)
  try change (fst (?a,?b)) with a; try change (snd (?a,?b)) with b;
  match goal with |- SF _ _ _ (vacuous_funspec _) => idtac end;
  match goal with H: @eq compspecs _ _ |- _ => rewrite <- H end;
@@ -391,7 +367,7 @@ red; red; repeat simple apply conj;
 | eexists; split; compute; reflexivity (* genv_find_func *)
 ].
 
-Lemma prove_G_justified:
+Lemma prove_G_justified: (* can be removed with VST 2.15 *)
  forall Espec cs V p Imports G,
  let SFF := @SF Espec cs V (QPglobalenv p) (Imports ++ G) in
  let obligations := filter_options (fun (ix: ident * funspec) =>
@@ -416,7 +392,7 @@ rewrite H0.
 auto.
 Qed.
 
-
+(* BEGIN can be removed with VST 2.15 *)
 Lemma prove_idlists_equiv: forall al bl : list ident,
   linking.SortPos.sort al = linking.SortPos.sort bl ->
   (forall i, In i al <-> In i bl).
@@ -600,5 +576,4 @@ Ltac solve_SF_internal P ::=
        | fast_Qed_reflexivity || fail "Lookup for a function pointer block in QPglobalenv failed"
    ]    ].
 
-
-(** END Things to go into vst/floyd/VSU.v *)
+(* END can be removed with VST 2.15 *)

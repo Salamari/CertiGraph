@@ -7,6 +7,29 @@ From CertiGraph.CertiGC Require Import forward_lemmas
 
 Local Open Scope logic.
 
+Lemma match_globals: 
+  forall gv : globals,
+  InitGPred (Vardefs (QPprog gc_stack.prog) ) gv |-- all_string_constants Ers gv.
+Proof.
+intros.
+unfold all_string_constants.
+repeat match goal with |- context [gv ?i] => progress (unfold i) end.
+set (j := Vardefs _); hnf in j; simpl in j; subst j.
+cbv [InitGPred fold_right map Maps.PTree.prev Maps.PTree.prev_append
+     globs2pred].
+Intros.
+rewrite !sepcon_assoc.
+apply sepcon_derives.
+apply derives_refl.
+repeat
+match goal with |- context [globvar2pred ?gv (?i, ?v)] =>
+  sep_apply (globvar2pred_cstring gv i v); [compute; split; reflexivity | ]
+end.
+clear.
+simpl.
+cancel.
+Qed.
+
 Definition GC_E : funspecs := nil.
 
 Definition GC_GP : globals -> mpred := all_string_constants Ers.
