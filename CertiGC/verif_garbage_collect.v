@@ -81,7 +81,6 @@ do 2 unfold_data_at (data_at _ thread_info_type _ _).
 cancel.
 Qed.
 
-Print Ltac change_compspecs'.
 #[export] Instance CCE: change_composite_env spec_boxing.CompSpecs CompSpecs.
  make_cs_preserve spec_boxing.CompSpecs CompSpecs.
 Defined.
