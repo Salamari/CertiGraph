@@ -10,7 +10,7 @@ certigraph:  graph/spanning_tree.vo graph/dag.vo graph/marked_graph.vo graph/loc
              graph/GraphAsList.vo graph/graph_isomorphism.vo graph/undirected_uf_lemmas.vo graph/SpaceAdjMatGraph1.vo graph/path_cost.vo \
              graph/SpaceUAdjMatGraph1.vo graph/SpaceUAdjMatGraph2.vo graph/SpaceUAdjMatGraph3.vo graph/SpaceEdgeLabelGraph.vo
 
-certigc: CertiGC/link.vo
+certigc: CertiGC/link.vo CertiGC/gc_correct.vo
 
 applications: binheap/verif_binary_heap.vo binheap/verif_binary_heap_pro.vo mark/verif_mark_bin.vo mark/verif_mark_bin_dag.vo \
             summatrix/verif_summatrix.vo copy/verif_copy_bin.vo dispose/verif_dispose_bin.vo \
