@@ -4,37 +4,12 @@
 #include "m.h"  /* use printm.c to create m.h */
 #include "config.h"
 #include "values.h"
+#include "boxing.h"
 #include "gc_stack.h"
 
 /* A version of GC that scans a stack in order to find the roots. It is useful
  * when compiling direct-style programs
  */
-
-
-/* The following 5 functions should (in practice) compile correctly in CompCert,
-   but the CompCert correctness specification does not _require_ that
-   they compile correctly:  their semantics is "undefined behavior" in
-   CompCert C (and in C11), but in practice they will work in any compiler. */
-
-int test_int_or_ptr (value x) /* returns 1 if int, 0 if aligned ptr */ {
-    return (int)(((intnat)x)&1);
-}
-
-intnat int_or_ptr_to_int (value x) /* precondition: is int */ {
-    return (intnat)x;
-}
-
-void * int_or_ptr_to_ptr (value x) /* precond: is aligned ptr */ {
-    return (void *)x;
-}
-
-value int_to_int_or_ptr(intnat x) /* precondition: is odd */ {
-    return (value)x;
-}
-
-value ptr_to_int_or_ptr(void *x) /* precondition: is aligned */ {
-    return (value)x;
-}
 
 int is_ptr(value x) {
     return test_int_or_ptr(x) == 0;
@@ -150,17 +125,6 @@ void printtree(FILE *f, struct heap *h, value v) {
 
 #endif
 
-void abort_with(char *s) {
-  fprintf(stderr, "%s", s);
-  exit(1);
-}
-
-int Is_from(value* from_start, value * from_limit,  value * v) {
-    return (from_start <= v && v < from_limit);
-}
-/* Assuming v is a pointer (is_ptr(v)), tests whether v points
-   somewhere into the "from-space" defined by from_start and from_limit */
-
 void forward (value *from_start,  /* beginning of from-space */
 	      value *from_limit,  /* end of from-space */
 	      value **next,       /* next available spot in to-space */
@@ -183,7 +147,7 @@ void forward (value *from_start,  /* beginning of from-space */
     v = (value*)int_or_ptr_to_ptr(va);
     /* printf("Start: %lld end"" %lld word %lld \n", from_start, from_limit, v); */
     /* if  (v == 4360698480) printf ("Found it\n"); */
-    if(Is_from(from_start, from_limit, v)) {
+    if(ptr_in_range(from_start, from_limit, v)) {
       /* printf("Moving\n"); */
       header_t hd = Hd_val(v);
       if(hd == 0) { /* already forwarded */

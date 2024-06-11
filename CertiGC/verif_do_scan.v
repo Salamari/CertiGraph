@@ -8,8 +8,9 @@ Require Import VST.msl.wand_frame.
 Require Import CertiGraph.CertiGC.env_graph_gc.
 Require Import CertiGraph.CertiGC.spatial_gcgraph.
 Require Import CertiGraph.msl_ext.iter_sepcon. 
-Require Import CertiGraph.CertiGC.gc_spec.
+Require Import CertiGraph.CertiGC.spec_gc.
 Require Import CertiGraph.msl_ext.ramification_lemmas.
+Require Import CertiGraph.CertiGC.forward_lemmas.
 
 Local Opaque Int64.repr.
 

@@ -10,10 +10,7 @@ certigraph:  graph/spanning_tree.vo graph/dag.vo graph/marked_graph.vo graph/loc
              graph/GraphAsList.vo graph/graph_isomorphism.vo graph/undirected_uf_lemmas.vo graph/SpaceAdjMatGraph1.vo graph/path_cost.vo \
              graph/SpaceUAdjMatGraph1.vo graph/SpaceUAdjMatGraph2.vo graph/SpaceUAdjMatGraph3.vo graph/SpaceEdgeLabelGraph.vo
 
-certigc: CertiGC/gc_correct.vo CertiGC/verif_conversion.vo CertiGC/verif_Is_from.vo CertiGC/gc_spec.vo CertiGC/verif_create_space.vo \
-         CertiGC/verif_create_heap.vo CertiGC/verif_make_tinfo.vo CertiGC/env_graph_gc.vo CertiGC/verif_is_ptr.vo CertiGC/verif_garbage_collect.vo \
-         CertiGC/verif_resume.vo CertiGC/GCGraph.vo CertiGC/verif_forward.vo CertiGC/verif_do_scan.vo CertiGC/verif_forward_roots.vo \
-         CertiGC/verif_do_generation.vo
+certigc: CertiGC/link.vo CertiGC/gc_correct.vo
 
 applications: binheap/verif_binary_heap.vo binheap/verif_binary_heap_pro.vo mark/verif_mark_bin.vo mark/verif_mark_bin_dag.vo \
             summatrix/verif_summatrix.vo copy/verif_copy_bin.vo dispose/verif_dispose_bin.vo \
@@ -32,7 +29,10 @@ CertiGC/GC_Source/m.h: CertiGC/GC_Source/printm
 
 GENERATED_FILES += CertiGC/gc_stack.v
 CertiGC/gc_stack.v: CertiGC/GC_Source/gc_stack.c CertiGC/GC_Source/config.h CertiGC/GC_Source/gc_stack.h CertiGC/GC_Source/mem.h CertiGC/GC_Source/values.h CertiGC/GC_Source/m.h
-#	$(CLIGHTGEN) $(CLG_FLAGS) -DVERIFFI -isystem `dirname $<` $< -o $@
+	$(CLIGHTGEN) $(CLG_FLAGS) -DVERIFFI $< -o $@
+
+GENERATED_FILES += CertiGC/boxing.v
+CertiGC/boxing.v: CertiGC/GC_Source/boxing.c CertiGC/GC_Source/config.h CertiGC/GC_Source/values.h
 	$(CLIGHTGEN) $(CLG_FLAGS) -DVERIFFI $< -o $@
 
 GENERATED_FILES += summatrix/summatrix.v

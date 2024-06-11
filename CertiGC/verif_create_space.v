@@ -1,11 +1,11 @@
-From CertiGraph.CertiGC Require Import env_graph_gc gc_spec.
+From CertiGraph.CertiGC Require Import env_graph_gc spec_gc forward_lemmas.
 
 Local Open Scope Z_scope.
 
 Lemma body_create_space: semax_body Vprog Gprog f_create_space create_space_spec.
 Proof.
   start_function.
-  forward_call (Tarray int_or_ptr_type n noattr, gv).
+  forward_call (spec_malloc.malloc_spec_sub (Tarray int_or_ptr_type n noattr)) gv.
     + entailer!. simpl. rewrite Z.max_r by lia. now rewrite Z.mul_comm.
     + simpl. rewrite Z.max_r by rep_lia.
      apply MSS_max_wordsize_unsigned_range; auto.

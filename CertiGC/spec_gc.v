@@ -5,7 +5,8 @@ Require Export CertiGraph.CertiGC.GCGraph.
 Require Export CertiGraph.CertiGC.spatial_gcgraph.
 Require Import CertiGraph.CertiGC.env_graph_gc.
 Require Import CertiGraph.msl_ext.iter_sepcon.
-
+Require CertiGraph.CertiGC.spec_boxing.
+Export spec_malloc.
 Local Open Scope logic.
 
 Identity Coercion LGraph_LabeledGraph: LGraph >-> LabeledGraph.
@@ -27,7 +28,7 @@ Definition is_string_constant (d: ident * globdef Clight.fundef type) : bool :=
 
 Definition sep_of_string_constant sh gv (d: ident * globdef Clight.fundef type) : mpred :=
   match d with
-  | (i, Gvar v) => cstring sh (map init_data2byte (gvar_init v)) (gv i)
+  | (i, Gvar v) => cstring sh (map init_data2byte (sublist 0 (Zlength (gvar_init v)-1) (gvar_init v))) (gv i)
   | _ => emp
   end.
 
@@ -43,66 +44,6 @@ Definition all_string_constants (sh: share) (gv: globals) : mpred :=
    let x := eval unfold sep_of_string_constant in x in
    match x with ?S ?A ?B => exact (sepcon A B) end).
 
-Definition test_int_or_ptr_spec :=
- DECLARE _test_int_or_ptr
- WITH x : val
- PRE [int_or_ptr_type]
-   PROP (valid_int_or_ptr x)
-   PARAMS (x)
-   GLOBALS ()
-   SEP ()
- POST [ tint ]
-   PROP()
-   RETURN(Vint (Int.repr (match x with
-                           | Vint _ => if Archi.ptr64 then 0 else 1
-                           | Vlong _ => if Archi.ptr64 then 1 else 0
-                           | _ => 0
-                           end)))
-   SEP().
-
-Definition int_or_ptr_to_int_spec :=
-  DECLARE _int_or_ptr_to_int
-  WITH x : val
-  PRE [int_or_ptr_type ]
-    PROP (is_int I32 Signed x)
-    PARAMS (x)
-    GLOBALS ()
-    SEP ()
-  POST [ (if Archi.ptr64 then tlong else tint) ]
-    PROP() RETURN (x) SEP().
-
-Definition int_or_ptr_to_ptr_spec :=
-  DECLARE _int_or_ptr_to_ptr
-  WITH x : val
-  PRE [int_or_ptr_type ]
-    PROP (isptr x)
-    PARAMS (x)
-    GLOBALS ()
-    SEP ()
-  POST [ tptr tvoid ]
-    PROP() RETURN (x) SEP().
-
-Definition int_to_int_or_ptr_spec :=
-  DECLARE _int_to_int_or_ptr
-  WITH x : val
-  PRE [ (if Archi.ptr64 then tlong else tint) ]
-    PROP (valid_int_or_ptr x)
-    PARAMS (x)
-    GLOBALS ()
-    SEP ()
-  POST [ int_or_ptr_type ]
-    PROP() RETURN (x) SEP().
-
-Definition ptr_to_int_or_ptr_spec :=
-  DECLARE _ptr_to_int_or_ptr
-  WITH x : val
-  PRE [tptr tvoid ]
-    PROP (valid_int_or_ptr x)
-    PARAMS (x)
-    GLOBALS ()
-    SEP()
-  POST [ int_or_ptr_type ]
-    PROP() RETURN (x) SEP().
 
 Definition is_ptr_spec :=
   DECLARE _is_ptr
@@ -119,57 +60,6 @@ Definition is_ptr_spec :=
                                 | _ => 0
                                 end)))
     SEP().
-
-Definition abort_with_spec :=
-  DECLARE _abort_with
-  WITH s: val, str: list byte, sh: share
-  PRE [tptr tschar]
-    PROP (readable_share sh)
-    PARAMS (s)
-    GLOBALS ()
-    SEP (cstring sh str s)
-  POST [ tvoid ]
-    PROP (False) RETURN() SEP().
-
-Definition IS_FROM_TYPE :=
-  ProdType (ProdType (ProdType
-                        (ProdType (ConstType share) (ConstType val))
-                        (ConstType Z)) (ConstType val)) Mpred.
-
-Program Definition Is_from_spec :=
-  DECLARE _Is_from
-  TYPE IS_FROM_TYPE
-  WITH sh: share, start : val, n: Z, v: val, P: mpred
-  PRE [tptr int_or_ptr_type,
-       tptr int_or_ptr_type,
-       tptr int_or_ptr_type]
-    PROP ()
-    PARAMS (start; offset_val n start; v)
-    GLOBALS ()
-    SEP (weak_derives P (memory_block sh n start * TT) && emp;
-         weak_derives P (valid_pointer v * TT) && emp; P)
-  POST [tint]
-    EX b: {v_in_range v start n} + {~ v_in_range v start n},
-    PROP ()
-    RETURN (Vint (Int.repr (if b then 1 else 0)))
-    SEP (P).
-Next Obligation.
-Proof.
-  repeat intro.
-  destruct x as ((((?, ?), ?), ?), ?); simpl.
-  unfold PROPx, LAMBDAx, GLOBALSx, LOCALx, SEPx, argsassert2assert; simpl;
-    rewrite !approx_andp; f_equal; f_equal.
-  rewrite !sepcon_emp, ?approx_sepcon, ?approx_idem, ?approx_andp.
-  f_equal; f_equal; [|f_equal]; now rewrite derives_nonexpansive_l.
-Qed.
-Next Obligation.
-Proof.
-  repeat intro.
-  destruct x as ((((?, ?), ?), ?), ?); simpl.
-  rewrite !approx_exp. apply f_equal; extensionality t.
-  unfold PROPx, LOCALx, SEPx; simpl; rewrite !approx_andp; f_equal; f_equal.
-  rewrite !sepcon_emp, approx_idem. reflexivity.
-Qed.
 
 Definition forward_spec :=
   DECLARE _forward
@@ -479,17 +369,8 @@ Definition free_heap_spec :=
   PROP () RETURN () 
   SEP (mem_mgr gv; all_string_constants rsh gv).
 *)
-
-Definition Gprog: funspecs :=
-  ltac:(with_library prog
-                     [test_int_or_ptr_spec;
-                      int_or_ptr_to_int_spec;
-                      int_or_ptr_to_ptr_spec;
-                      int_to_int_or_ptr_spec;
-                      ptr_to_int_or_ptr_spec;
-                      is_ptr_spec;
-                      Is_from_spec;
-                      abort_with_spec;
+Definition GC_Internal : funspecs :=
+                     [is_ptr_spec;
                       forward_spec;
                       forward_roots_spec;
                       forward_remset_spec;
@@ -499,4 +380,28 @@ Definition Gprog: funspecs :=
                       create_heap_spec;
                       make_tinfo_spec;
                       resume_spec;
-                      garbage_collect_spec]).
+                      garbage_collect_spec;
+                      (_garbage_collect_all, vacuous_funspec (Internal f_garbage_collect_all));
+                      (_certicoq_modify, vacuous_funspec (Internal f_certicoq_modify));
+                      (_export_heap, vacuous_funspec (Internal f_export_heap));
+                      (_print_heapsize, vacuous_funspec (Internal f_print_heapsize));
+                      (_reset_heap, vacuous_funspec (Internal f_reset_heap));
+                      (_free_heap, vacuous_funspec (Internal f_free_heap))
+                       ].
+
+Definition GC_ASI : funspecs := 
+                     [ garbage_collect_spec].
+
+Definition Boxing_subset := 
+                     [spec_boxing.test_int_or_ptr_spec; 
+                      spec_boxing.int_or_ptr_to_ptr_spec;
+                      spec_boxing.ptr_to_int_or_ptr_spec;
+                      spec_boxing.ptr_in_range_spec;
+                      spec_boxing.abort_with_spec].
+
+
+Definition GC_imported_specs:funspecs := 
+  MallocASI ++ Boxing_subset.
+
+Definition Gprog: funspecs := GC_imported_specs ++ GC_Internal.
+

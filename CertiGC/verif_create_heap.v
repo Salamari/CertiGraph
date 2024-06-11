@@ -1,4 +1,4 @@
-From CertiGraph.CertiGC Require Import env_graph_gc gc_spec.
+From CertiGraph.CertiGC Require Import env_graph_gc spec_gc forward_lemmas.
 
 Local Open Scope logic.
 
@@ -69,7 +69,7 @@ Qed.
 Lemma body_create_heap: semax_body Vprog Gprog f_create_heap create_heap_spec.
 Proof.
   start_function.
-  forward_call (heap_type, gv).
+  forward_call (spec_malloc.malloc_spec_sub heap_type) gv.
   Intros h. if_tac.
   - subst h; forward_if False; [| first [exfalso; now apply H | inversion H ]].
     unfold all_string_constants; Intros.

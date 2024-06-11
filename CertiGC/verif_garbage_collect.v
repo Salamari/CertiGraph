@@ -1,4 +1,4 @@
-From CertiGraph.CertiGC Require Import env_graph_gc gc_spec.
+From CertiGraph.CertiGC Require Import env_graph_gc spec_gc forward_lemmas.
 
 Local Open Scope logic.
 
@@ -80,6 +80,10 @@ unfold thread_info_rep, heap_rep, heap_struct_rep.
 do 2 unfold_data_at (data_at _ thread_info_type _ _).
 cancel.
 Qed.
+
+#[export] Instance CCE: change_composite_env spec_boxing.CompSpecs CompSpecs.
+ make_cs_preserve spec_boxing.CompSpecs CompSpecs.
+Defined.
 
 Lemma body_garbage_collect:
   semax_body Vprog Gprog f_garbage_collect garbage_collect_spec.
@@ -444,6 +448,9 @@ Proof.
         -- rewrite H23 in H38. eapply safe_to_copy_complete; eauto.
         -- rewrite HN. auto.
       * forward. Intros. Exists g2 roots2 t_info2. rewrite <- H23 in *. entailer!!.
-  - Intros g2 roots2 t_info2. unfold all_string_constants. Intros.
-     forward_call; contradiction.
+  - Intros g2 roots2 t_info2.
+    unfold all_string_constants. Intros.
+    forward_call.
+    contradiction.
 Qed.
+

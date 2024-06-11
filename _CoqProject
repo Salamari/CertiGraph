@@ -122,12 +122,16 @@ unionfind/verif_unionfind_iter_rank.v
 unionfind/verif_unionfind_arr.v
 
 
+CertiGC/link.v
 CertiGC/gc_stack.v 
+CertiGC/boxing.v 
 CertiGC/data_at_test.v
 CertiGC/spatial_gcgraph.v
-CertiGC/verif_conversion.v
 CertiGC/verif_Is_from.v
-CertiGC/gc_spec.v
+CertiGC/spec_boxing.v
+CertiGC/verif_boxing.v
+CertiGC/spec_gc.v
+CertiGC/verif_gc.v
 CertiGC/verif_create_space.v
 CertiGC/verif_create_heap.v
 CertiGC/verif_make_tinfo.v

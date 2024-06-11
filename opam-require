@@ -1,0 +1,5 @@
+#
+# Usage:  bash opam-require foo.3.5 bar.1.2 baz.0
+#  makes sure that those three exact packages are installed, as listed by 'opam list -i'
+#  Failure indicated by messages on stderr, plus an exit code
+opam list -i | awk -v NEED="$*" 'BEGIN{split(NEED,N); for (i in N) A[N[i]]=1} {G= $1 "." $2; if (A[G]) A[G]=0} END{for (x in A) if (A[x]) {print "opam package not installed: " x > "/dev/stderr"; ERROR=1}; if (ERROR) exit 1}'

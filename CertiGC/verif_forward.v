@@ -1,4 +1,4 @@
-From CertiGraph.CertiGC Require Import env_graph_gc gc_spec.
+From CertiGraph.CertiGC Require Import env_graph_gc spec_gc forward_lemmas.
 Require Import CertiGraph.msl_ext.ramification_lemmas.
 Require Import CertiGraph.CertiGC.verif_forward1.
 Require Import CertiGraph.CertiGC.verif_forward2.
