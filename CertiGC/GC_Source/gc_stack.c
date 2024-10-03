@@ -40,7 +40,7 @@ int is_ptr(value x) {
     return test_int_or_ptr(x) == 0;
 }
 
-/* A "space" describes one generation of the generational collector. 
+/* A "space" describes one generation of the generational collector.
 struct space {
   value *start, *next, *limit, *rem_limit;
   };*/
@@ -53,7 +53,7 @@ struct space {
 /*  Using RATIO=2 is faster than larger ratios, empirically */
 #endif
 
-/* Rationale for LOG_NURSERY_SIZE = 16:  
+/* Rationale for LOG_NURSERY_SIZE = 16:
    The size of generation 0 (the "nursery") should approximately match the
    size of the level-2 cache of the machine, according to:
       Cache Performance of Fast-Allocating Programs,
@@ -75,7 +75,7 @@ struct space {
 */
 
 
-/* The definition of MAX_SPACES allows the largest generation to be as big 
+/* The definition of MAX_SPACES allows the largest generation to be as big
    as half the entire address space.
    Here's the math: 8*sizeof(value) is the number of bits per word.
    Counting the nursery as generation 0, the largest generation is MAX_SPACES-1,
@@ -222,8 +222,8 @@ void forward_remset (struct space *from,  /* descriptor of from-space */
   value *q = from_limit;
   assert (from_rem_limit-from_limit <= to->limit-to->start);
   while (q != from_rem_limit) {
-    value *p = *(value**)q;
-    if (!(from_start <= p && p < from_limit)) {
+    value *p = *(value **)q;
+    if (!Is_from(from_start, from_limit, p)) {
       value oldp= *p, newp;
       forward(from_start, from_limit, next, p, DEPTH);
       newp= *p;
@@ -362,7 +362,7 @@ struct thread_info *make_tinfo(void) {
   struct thread_info *tinfo;
   h = create_heap();
   tinfo = (struct thread_info *)malloc(sizeof(struct thread_info));
-  if (!tinfo) 
+  if (!tinfo)
     abort_with("Could not allocate thread_info struct\n");
 
   tinfo->heap=h;
@@ -491,7 +491,7 @@ void *export_heap(struct thread_info *ti, value root) {
   frame.next=roots+1;
   frame.prev=NULL;
   ti->fp= &frame;
-  
+
   /* if root is unboxed, return it */
   if(!is_ptr(root))
     return (void *)root;
@@ -546,9 +546,6 @@ void print_heapsize(struct thread_info *ti) {
  When p and q have type  *foo,  then this is much like  ((int)p-(int)q)/sizeof(foo).
  But note this is a SIGNED division, which makes it quite dangerous if ((int)p-(int)q)
  can be larger than the maximum signed integer.  So we have to be quite careful in
- the program and the proof, especially when (on a 32-bit machines) our largest generation 
- might be similar in size to the entire address space. 
+ the program and the proof, especially when (on a 32-bit machines) our largest generation
+ might be similar in size to the entire address space.
 */
-
-    
-    
