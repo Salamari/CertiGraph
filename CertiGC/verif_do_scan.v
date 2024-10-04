@@ -7,7 +7,7 @@ Require Import CertiGraph.CertiGC.GCGraph.
 Require Import VST.msl.wand_frame.
 Require Import CertiGraph.CertiGC.env_graph_gc.
 Require Import CertiGraph.CertiGC.spatial_gcgraph.
-Require Import CertiGraph.msl_ext.iter_sepcon. 
+Require Import CertiGraph.msl_ext.iter_sepcon.
 Require Import CertiGraph.CertiGC.gc_spec.
 Require Import CertiGraph.msl_ext.ramification_lemmas.
 
@@ -62,7 +62,7 @@ Proof.
                       forward_condition g' h' from to;
                       heap_relation h h';
                       closure_has_index g' to (to_index + n);
-                      scan_vertex_while_loop from to (nat_seq to_index n) g g')
+                      scan_vertex_while_loop from to (seq to_index n) g g')
                 LOCAL
                 (temp _s (offset_val (- WORD_SIZE)
                                      (vertex_address g' (to, (to_index + n)%nat)));
@@ -70,7 +70,7 @@ Proof.
                  temp _from_limit (limit_address g' h' from);
                  temp _next (heap_next_address hp to))
                 SEP (all_string_constants rsh gv;
-               outlier_rep outlier; graph_rep g'; 
+               outlier_rep outlier; graph_rep g';
                roots_rep sh rootpairs;
                heap_rep sh h' hp))
   break: (EX g' : LGraph, EX h': heap,
@@ -80,11 +80,11 @@ Proof.
                 heap_relation h h')
           LOCAL ()
           SEP (all_string_constants rsh gv;
-               outlier_rep outlier; graph_rep g'; 
+               outlier_rep outlier; graph_rep g';
                roots_rep sh rootpairs;
                heap_rep sh h' hp)).
   - Exists O g h. destruct H as [? [? [? ?]]].
-    simpl fst in *; simpl snd in *; 
+    simpl fst in *; simpl snd in *;
     replace (to_index + 0)%nat with to_index by lia. entailer!!.
     split; [|split]; [ split3; simpl; auto | apply hr_refl | constructor].
   - Intros n g' h'. remember (to_index + n)%nat as index.
@@ -186,14 +186,14 @@ Proof.
                                   [unfold WORD_SIZE; lia | apply space_order].
     + assert (index_offset < used_offset). {
         destruct (zlt index_offset used_offset); trivial.
-        match type of H24 with force_val ?A = _ => destruct A; inv H24 end. simpl in H26; subst. inv H25. 
+        match type of H24 with force_val ?A = _ => destruct A; inv H24 end. simpl in H26; subst. inv H25.
       }
       forward. entailer!!. red. rewrite <- H20 in H26.
       rewrite <- Z.mul_lt_mono_pos_l in H26 by (unfold WORD_SIZE; lia).
       apply pvs_lt_rev in H26. assumption.
     + assert (~ index_offset < used_offset). {
         destruct (zlt index_offset used_offset); trivial.
-        match type of H24 with force_val ?A = _ => destruct A; inv H24 end. simpl in H26; subst. inv H25. 
+        match type of H24 with force_val ?A = _ => destruct A; inv H24 end. simpl in H26; subst. inv H25.
       }
       forward. thaw FR. unfold thread_info_rep, heap_rep, heap_struct_rep.
       Exists g' h'. unfold forward_condition. entailer!!.
@@ -372,7 +372,7 @@ Proof.
                      eapply svfl_raw_mark in H29; [apply H29 | assumption..|].
                      simpl. lia.
                  --- eapply svfl_raw_tag in H29; try eassumption.
-                     rewrite <- H29. 
+                     rewrite <- H29.
                      unfold no_scan in H27. lia. simpl; auto.
                  --- simpl; auto.
               ** Intros vret. destruct vret as [[g4 h4] roots']. simpl fst in *.
@@ -394,7 +394,7 @@ Proof.
                    red in H38. rewrite Forall_forall in H38.
                    apply graph_has_v_in_closure. apply H38.
                    apply filter_sum_right_In_iff. rewrite <- H43. apply Znth_In.
-                   rewrite Zlength_map in H39. auto. 
+                   rewrite Zlength_map in H39. auto.
                  }
                  intros H38.
                  destruct H38 as [? [? [? ?]]].
@@ -421,7 +421,7 @@ Proof.
                        rewrite nat_inc_list_nth; [rewrite Z2Nat.id; lia|].
                        rewrite <- ZtoNat_Zlength. rewrite Zlength_correct in H47.
                        rewrite nat_inc_list_length in H47. rewrite Nat2Z.inj_lt.
-                       rewrite !Z2Nat.id; lia. } rewrite H48. assumption.                     
+                       rewrite !Z2Nat.id; lia. } rewrite H48. assumption.
                  --- apply hr_trans with h3; assumption.
                  --- f_equal. symmetry. eapply fr_vertex_address; eauto.
                      apply graph_has_v_in_closure; assumption.
@@ -435,7 +435,7 @@ Proof.
         destruct (negb (Int.lt (Int.repr (raw_tag (vlabel g' (to, index)))) (Int.repr 251))).
         2: simpl in H27; contradiction H27; reflexivity.
         clear H27; rename Hxx into H27.
-        specialize (H27 (eq_refl _)). 
+        specialize (H27 (eq_refl _)).
         forward. Exists g' h'.
         unfold forward_condition. entailer!!.
         try (rewrite Int64.unsigned_repr;
@@ -495,7 +495,7 @@ Proof.
              - eapply svfl_graph_has_v in H33; eauto. destruct H33. assumption. }
            Exists (n + 1)%nat g'' h''. destruct H27 as [? [? [? ?]]]. entailer!!.
            replace (n + 1)%nat with (S n) by lia.
-           rewrite nat_seq_S, Nat.add_comm. destruct H30 as [[? ?] | [? ?]].
+           rewrite seq_S. destruct H30 as [[? ?] | [? ?]].
            ++ subst g''. split; [| apply svwl_add_tail_no_scan]; easy.
            ++ split; [|apply svwl_add_tail_scan with g']; easy.
   - Intros g' h'. Exists g' h'. entailer!!.

@@ -1269,7 +1269,7 @@ Proof.
   unfold lgraph_add_copied_v at 1. unfold nth_gen. simpl.
   rewrite cvmgil_eq by assumption. simpl. unfold nth_gen in Heqn. rewrite <- Heqn.
   rewrite nat_inc_list_app, map_app, iter_sepcon_app_sepcon, sepcon_comm.
-  simpl nat_seq. change (nth to (g_gen (glabel g)) null_info) with
+  simpl seq. change (nth to (g_gen (glabel g)) null_info) with
                      (nth_gen g to) in Heqn. f_equal.
   - simpl. normalize. replace (to, n) with (new_copied_v g to) by
         (unfold new_copied_v; subst n; reflexivity). unfold vertex_rep. f_equal.
@@ -1299,10 +1299,10 @@ Proof.
   rewrite (lacv_icgr_not_eq (nat_inc_list to) g v to); try assumption.
   3: subst n; apply H. 2: intro; rewrite nat_inc_list_In_iff in H5; lia.
   rewrite sepcon_comm, sepcon_assoc. f_equal. assert (m = 1 + (m - 1))%nat by lia.
-  rewrite H5, nat_seq_app, !iter_sepcon_app_sepcon.
-  assert (nat_seq to 1 = [to]) by reflexivity. rewrite H6. clear H6.
-  rewrite (lacv_icgr_not_eq (nat_seq (to + 1) (m - 1)) g v to); try assumption.
-  3: subst n; apply H. 2: intro; rewrite nat_seq_In_iff in H6; lia.
+  rewrite H5, seq_app, !iter_sepcon_app_sepcon.
+  assert (seq to 1 = [to]) by reflexivity. rewrite H6. clear H6.
+  rewrite (lacv_icgr_not_eq (seq (to + 1) (m - 1)) g v to); try assumption.
+  3: subst n; apply H. 2: intro; rewrite in_seq in H6; lia.
   rewrite sepcon_assoc, sepcon_comm, sepcon_assoc, sepcon_comm. f_equal.
   simpl iter_sepcon. normalize. clear m Heqm H3 H4 H5. subst n.
   rewrite <- lacv_generation_rep_eq; [reflexivity | assumption..].

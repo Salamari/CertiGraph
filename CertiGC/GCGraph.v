@@ -32,9 +32,11 @@ Fixpoint find_struct (i: ident) (cs: list composite_definition) : option members
   |  _ :: rest => find_struct i rest
   end.
 
-Definition MAX_SPACES: Z := Eval compute in (match find_struct gc_stack._heap gc_stack.composites with
-| Some  (Member_plain _ (Tarray _ n _) :: nil) => n | _ => 0
-end).
+Definition MAX_SPACES: Z := Eval compute in
+    (match find_struct gc_stack._heap gc_stack.composites with
+     | Some  (Member_plain _ (Tarray _ n _) :: nil) => n | _ => 0
+     end).
+
 Lemma MAX_SPACES_eq: MAX_SPACES = ltac:(let n := eval compute in MAX_SPACES in exact n). Proof. reflexivity. Qed.
 #[export] Hint Rewrite MAX_SPACES_eq: rep_lia.
 
@@ -61,7 +63,6 @@ Definition WORD_SIZE: Z := Eval cbv [Archi.ptr64] in if Archi.ptr64 then 8 else 
 Definition MAX_UINT: Z := Eval cbv [Archi.ptr64] in
       if Archi.ptr64 then Int64.max_unsigned else Int.max_unsigned.
 
-
 Definition MAX_SPACE_SIZE: Z :=
     Z.shiftl 1 ltac:(let a := constr:(LOG_NURSERY_SIZE+MAX_SPACES-1) in
                      let a := eval compute in a in exact a).
@@ -78,16 +79,6 @@ Definition SPACE_STRUCT_SIZE: Z :=
 
 Lemma four_div_WORD_SIZE: (4 | WORD_SIZE).
 Proof. first [now exists 1 | now exists 2]. Qed.
-
-Lemma MSS_eq_unsigned:
-  Int.unsigned (Int.shl (Int.repr 1) (Int.repr 29)) = Z.shiftl 1 29.
-Proof.
-  rewrite Int.shl_mul_two_p.
-  rewrite (Int.unsigned_repr 29) by (compute; split; discriminate).
-  rewrite mul_repr. rewrite Zbits.Zshiftl_mul_two_p by lia.
-  rewrite !Z.mul_1_l, Int.unsigned_repr;
-    [lia | compute; split; intro S; discriminate].
-Qed.
 
 Lemma MSS_max_unsigned_range: forall n,
     0 <= n <= MAX_SPACE_SIZE ->
@@ -420,83 +411,45 @@ Proof.
   intros. unfold vertex_size. pose proof (raw_fields_range (vlabel g v)). lia.
 Qed.
 
-Fixpoint nat_seq (s: nat) (total: nat): list nat :=
-  match total with
-  | O => nil
-  | S n => s :: nat_seq (S s) n
-  end.
-
-Lemma nat_seq_length: forall s n, length (nat_seq s n) = n.
-Proof. intros. revert s. induction n; intros; simpl; [|rewrite IHn]; reflexivity. Qed.
-
-Lemma nat_seq_S: forall i num, nat_seq i (S num) = nat_seq i num ++ [(num + i)%nat].
-Proof.
-  intros. revert i. induction num; intros. 1: simpl; reflexivity.
-  remember (S num). simpl. rewrite (IHnum (S i)). subst. simpl. repeat f_equal. lia.
-Qed.
-
-Lemma nat_seq_In_iff: forall s n i, In i (nat_seq s n) <-> (s <= i < s + n)%nat.
-Proof. intros. revert s. induction n; intros; simpl; [|rewrite IHn]; lia. Qed.
-
-Lemma nat_seq_NoDup: forall s n, NoDup (nat_seq s n).
-Proof.
-  intros. revert s. induction n; intros; simpl; constructor. 2: apply IHn.
-  intro. rewrite nat_seq_In_iff in H. lia.
-Qed.
-
 Local Close Scope Z_scope.
 
-Lemma nat_seq_nth: forall s num n a, n < num -> nth n (nat_seq s num) a = s + n.
-Proof.
-  intros. revert s n H. induction num; intros. 1: exfalso; lia. simpl. destruct n.
-  1: lia. specialize (IHnum (S s) n). replace (s + S n) with (S s + n) by lia.
-  rewrite IHnum; [reflexivity | lia].
-Qed.
-
-Lemma nat_seq_app: forall s n m, nat_seq s (n + m) = nat_seq s n ++ nat_seq (s + n) m.
-Proof.
-  intros. revert s; induction n; simpl; intros.
-  - rewrite Nat.add_0_r. reflexivity.
-  - f_equal. rewrite IHn. replace (S s + n) with (s + S n) by lia. reflexivity.
-Qed.
-
-Lemma nat_seq_Permutation_cons: forall s i n,
-    i < n -> exists l, Permutation (nat_seq s n) (s + i :: l).
+Lemma seq_Permutation_cons: forall s i n,
+    i < n -> exists l, Permutation (seq s n) (s + i :: l).
 Proof.
   intros. induction n. 1: lia. replace (S n) with (n + 1) by lia.
-  rewrite nat_seq_app. simpl. destruct (Nat.eq_dec i n).
-  - subst i. exists (nat_seq s n). symmetry. apply Permutation_cons_append.
+  rewrite seq_app. simpl. destruct (Nat.eq_dec i n).
+  - subst i. exists (seq s n). symmetry. apply Permutation_cons_append.
   - assert (i < n) by lia. apply IHn in H0. destruct H0 as [l ?].
     exists (l +:: (s + n)). rewrite app_comm_cons. apply Permutation_app_tail.
     assumption.
 Qed.
 
-Definition nat_inc_list (n: nat) : list nat := nat_seq O n.
+Definition nat_inc_list (n: nat) : list nat := seq O n.
 
 Lemma nat_inc_list_length: forall num, length (nat_inc_list num) = num.
-Proof. intros. unfold nat_inc_list. rewrite nat_seq_length. reflexivity. Qed.
+Proof. intros. unfold nat_inc_list. rewrite seq_length. reflexivity. Qed.
 
 Lemma nat_inc_list_S: forall num, nat_inc_list (S num) = nat_inc_list num ++ [num].
-Proof. intros. unfold nat_inc_list. rewrite nat_seq_S. repeat f_equal. lia. Qed.
+Proof. intros. unfold nat_inc_list. rewrite seq_S. repeat f_equal. Qed.
 
 Lemma nat_inc_list_In_iff: forall i n, In i (nat_inc_list n) <-> i < n.
-Proof. intros. unfold nat_inc_list. rewrite nat_seq_In_iff. lia. Qed.
+Proof. intros. unfold nat_inc_list. rewrite in_seq. lia. Qed.
 
 Lemma nat_inc_list_nth: forall i n a, i < n -> nth i (nat_inc_list n) a = i.
-Proof. intros. unfold nat_inc_list. rewrite nat_seq_nth; [lia | assumption]. Qed.
+Proof. intros. unfold nat_inc_list. rewrite seq_nth; [lia | assumption]. Qed.
 
 Lemma nat_inc_list_app: forall n m,
-    nat_inc_list (n + m) = nat_inc_list n ++ nat_seq n m.
-Proof. intros. unfold nat_inc_list. rewrite nat_seq_app. reflexivity. Qed.
+    nat_inc_list (n + m) = nat_inc_list n ++ seq n m.
+Proof. intros. unfold nat_inc_list. rewrite seq_app. reflexivity. Qed.
 
 Lemma nat_inc_list_NoDup: forall n, NoDup (nat_inc_list n).
-Proof. intros. unfold nat_inc_list. apply nat_seq_NoDup. Qed.
+Proof. intros. unfold nat_inc_list. apply seq_NoDup. Qed.
 
 Lemma nat_inc_list_Permutation_cons: forall i n,
     i < n -> exists l, Permutation (nat_inc_list n) (i :: l).
 Proof.
   intros. unfold nat_inc_list. replace i with (O + i) by lia.
-  apply nat_seq_Permutation_cons. assumption.
+  apply seq_Permutation_cons. assumption.
 Qed.
 
 Local Open Scope Z_scope.
@@ -1343,7 +1296,7 @@ Lemma make_fields_the_same: forall (g1 g2: LGraph) v,
 Proof.
   intros. unfold make_fields_vals, make_fields. remember O. clear Heqn. rewrite H0.
   remember (raw_fields (vlabel g2 v)) as l. clear Heql.
-  cut (forall fl, map (field2val (raw_tag (vlabel g2 v)) g1) fl = 
+  cut (forall fl, map (field2val (raw_tag (vlabel g2 v)) g1) fl =
                   map (field2val (raw_tag (vlabel g2 v)) g2) fl).
   - intros. rewrite H2. rewrite (vertex_address_the_same g1 g2) by assumption.
     reflexivity.
@@ -1529,7 +1482,7 @@ Definition forward_p_compatible
   match p with
   | inl root_index => 0 <= root_index < Zlength roots
   | inr (v, n) => graph_has_v g v /\ 0 <= n < Zlength (vlabel g v).(raw_fields) /\
-                  (vlabel g v).(raw_mark) = false /\ 
+                  (vlabel g v).(raw_mark) = false /\
                   (vlabel g v).(raw_tag) < NO_SCAN_TAG /\
                   vgeneration v <> from
   end.
@@ -1718,7 +1671,7 @@ Lemma pvs_mono_strict: forall g gen i j,
 Proof.
   intros. assert (j = i + (j - i)) by lia. rewrite H0. remember (j - i). subst j.
   unfold previous_vertices_size. rewrite nat_inc_list_app, fold_left_app.
-  apply vs_accum_list_lt. pose proof (nat_seq_length i n). destruct (nat_seq i n).
+  apply vs_accum_list_lt. pose proof (seq_length n i). destruct (seq i n).
   - simpl in H0. lia.
   - intro S; inversion S.
 Qed.
@@ -3779,7 +3732,7 @@ Inductive scan_vertex_while_loop (from to: nat):
     scan_vertex_while_loop from to (i :: il) g1 g3.
 
 Definition do_scan_relation (from to to_index: nat) (g1 g2: LGraph) : Prop :=
-  exists n, scan_vertex_while_loop from to (nat_seq to_index n) g1 g2 /\
+  exists n, scan_vertex_while_loop from to (seq to_index n) g1 g2 /\
             ~ gen_has_index g2 to (to_index + n).
 
 Definition gen_unmarked (g: LGraph) (gen: nat): Prop :=
@@ -4825,7 +4778,7 @@ Proof.
   intros. inversion H0; subst; try lia; try subst new_g.
   - apply lcv_gen_v_num_to; auto.
   - rewrite lgd_gen_v_num_to. lia.
-  - rewrite lgd_gen_v_num_to. apply lcv_gen_v_num_to. assumption. 
+  - rewrite lgd_gen_v_num_to. apply lcv_gen_v_num_to. assumption.
 Qed.
 
 Lemma frr_gen_v_num_to: forall from to roots1 g1 roots2 g2,
@@ -4896,7 +4849,7 @@ Proof.
 Qed.
 
 Lemma svfl_dst_unchanged: forall from to v l g1 g2,
-    graph_has_v g1 v -> raw_mark (vlabel g1 v) = false -> 
+    graph_has_v g1 v -> raw_mark (vlabel g1 v) = false ->
     (raw_tag (vlabel g1 v) < NO_SCAN_TAG)%Z -> vgeneration v <> from ->
     (forall i,  In i l -> i < length (raw_fields (vlabel g1 v))) ->
     graph_has_gen g1 to -> scan_vertex_for_loop from to v l g1 g2 ->
@@ -5101,7 +5054,7 @@ Proof.
 Qed.
 
 Lemma svfl_dst_changed: forall from to v l g1 g2,
-    graph_has_v g1 v -> raw_mark (vlabel g1 v) = false -> 
+    graph_has_v g1 v -> raw_mark (vlabel g1 v) = false ->
     (raw_tag (vlabel g1 v) < NO_SCAN_TAG)%Z ->
     vgeneration v <> from ->
     copy_compatible g1 -> no_dangling_dst g1 -> from <> to ->
@@ -5124,7 +5077,7 @@ Proof.
   - subst a. cut (vgeneration (dst g3 e) <> from).
     + intros. cut (dst g2 e = dst g3 e). 1: intro HS; rewrite HS; assumption.
       symmetry. apply (svfl_dst_unchanged from to v l); auto.
-      * erewrite <- fr_raw_tag; eauto. 
+      * erewrite <- fr_raw_tag; eauto.
       * subst e; simpl; assumption.
       * intros. subst e. intro. inversion H11. subst. apply NoDup_cons_2 in H6.
         contradiction.
@@ -5133,7 +5086,7 @@ Proof.
         left; reflexivity.
       * unfold make_fields in H8 |-*. erewrite svfl_raw_fields; eauto.
   - eapply (IHl g3); eauto.
-    + erewrite <- fr_raw_tag; eauto. 
+    + erewrite <- fr_raw_tag; eauto.
     + eapply (fr_copy_compatible _ _ _ _ g1); eauto.
     + eapply (fr_O_no_dangling_dst _ _ _ g1); eauto.
       * simpl. intuition auto with *. rewrite Zlength_correct. apply inj_lt. apply H5.
@@ -5143,7 +5096,7 @@ Proof.
 Qed.
 
 Lemma svfl_no_edge2from: forall from to v g1 g2,
-    graph_has_v g1 v -> raw_mark (vlabel g1 v) = false -> 
+    graph_has_v g1 v -> raw_mark (vlabel g1 v) = false ->
     (raw_tag (vlabel g1 v) < NO_SCAN_TAG)%Z ->
     vgeneration v <> from ->
     copy_compatible g1 -> no_dangling_dst g1 -> from <> to -> graph_has_gen g1 to ->
@@ -5185,7 +5138,7 @@ Proof.
 Qed.
 
 Lemma svfl_no_dangling_dst: forall from to v l g1 g2,
-    graph_has_v g1 v -> raw_mark (vlabel g1 v) = false -> 
+    graph_has_v g1 v -> raw_mark (vlabel g1 v) = false ->
     (raw_tag (vlabel g1 v) < NO_SCAN_TAG)%Z ->
     vgeneration v <> from ->
     copy_compatible g1 -> graph_has_gen g1 to -> from <> to ->
@@ -5348,14 +5301,14 @@ Proof.
       erewrite (frr_dst_unchanged _ _ _ _ _ g1) in H7; eauto.
       erewrite (svwl_dst_unchanged) in H7; eauto; simpl.
       * eapply (frr_gen_unmarked _ _ _ g); eauto.
-      * repeat intro. rewrite nat_seq_In_iff in H18. destruct H18 as [? _].
+      * repeat intro. rewrite in_seq in H18. destruct H18 as [? _].
         destruct H13. simpl in H19. red in H19. lia.
     + eapply svwl_no_edge2from; eauto.
       * eapply (frr_gen_unmarked _ _ _ g); eauto.
       * eapply (frr_copy_compatible from to _ g); eauto.
       * eapply (frr_no_dangling_dst _ _ _ g); eauto.
-      * apply nat_seq_NoDup.
-      * rewrite nat_seq_In_iff. unfold gen_has_index in H11.
+      * apply seq_NoDup.
+      * rewrite in_seq. unfold gen_has_index in H11.
         unfold gen_v_num in H13. lia.
   - eapply (frr_gen2gen_no_edge _ _ _ g _ g1) in H7; eauto.
     destruct H6 as [m [? ?]]. eapply (svwl_gen2gen_no_edge from to _ g1 g2); eauto.
