@@ -358,7 +358,7 @@ Proof.
               assert (graph_has_v g3 (to, index)) by
                   (eapply svfl_graph_has_v in H29; [apply H29| assumption..]).
               forward_call (rsh, sh, gv, g3, h3, hp, rootpairs, roots,
-                            outlier, from, to, 0, (@inr Z _ ((to, index), i - 1))).
+                            outlier, from, to, 0, ForwardPntVertex (to, index) (i - 1)).
               ** simpl snd. apply prop_right. simpl.
                  do 4 f_equal.
                  first [rewrite sem_add_pi_ptr_special' |
@@ -393,9 +393,8 @@ Proof.
                    eapply fr_vertex_address; try eassumption.
                    red in H38. rewrite Forall_forall in H38.
                    apply graph_has_v_in_closure. apply H38.
-                   apply filter_sum_right_In_iff. rewrite <- H43. apply Znth_In.
-                   rewrite Zlength_map in H39. auto.
-                 }
+                   apply (filter_proj_In_iff root_proj_vertex_spec). rewrite <- H43.
+                   apply Znth_In. rewrite Zlength_map in H39. auto. }
                  intros H38.
                  destruct H38 as [? [? [? ?]]].
                  assert (gen_start g3 from = gen_start g4 from) by

@@ -239,7 +239,7 @@ Definition connected (g: PGraph) (n : V) :=
 Lemma connected_exists_path:
   forall (g: PGraph) u v,
     connected g u v <->
-    exists p, 
+    exists p,
       valid_upath g p /\
       hd_error p = Some u /\ last_error p = Some v.
 Proof. intros; split; intros; auto. Qed.
@@ -275,7 +275,7 @@ rewrite H2, H3. reflexivity.
 split. assert (p1 = u::(tl p1)). apply hd_error_tl_repr. split. apply H1. reflexivity.
 rewrite H5. rewrite <- app_comm_cons. simpl. reflexivity.
 destruct p2 eqn:H5. inversion H4.
-destruct u0. simpl in *. rewrite <- app_nil_end. rewrite <- H4. rewrite H3. apply H2.
+destruct u0. simpl in *. rewrite app_nil_r. rewrite <- H4. rewrite H3. apply H2.
 simpl. apply last_err_app. simpl in H4. simpl. apply H4.
 Qed.
 
@@ -995,7 +995,7 @@ apply H6. apply (H p' l'); auto.
 Qed.
 
 Lemma bridge_splittable:
-forall p g u v e, connected_by_path g p u v -> bridge g e u v -> 
+forall p g u v e, connected_by_path g p u v -> bridge g e u v ->
   (exists p1 p2, p = p1++p2 /\
     ((connected_by_path g p1 u (src g e) /\ connected_by_path g p2 (dst g e) v) \/
       (connected_by_path g p1 u (dst g e) /\ connected_by_path g p2 (src g e) v))
@@ -1468,7 +1468,7 @@ Qed.
 (******************LABELED GRAPHS******************)
 
 Local Coercion pg_lg: LabeledGraph >-> PreGraph.
-Local Coercion lg_gg: GeneralGraph >-> LabeledGraph. 
+Local Coercion lg_gg: GeneralGraph >-> LabeledGraph.
 
 Context {DV DE DG: Type}.
 Local Notation LGraph := (LabeledGraph V E DV DE DG).

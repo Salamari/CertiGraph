@@ -6,18 +6,18 @@ Import graph_model List_ext.
 Local Open Scope logic.
 
 
-Ltac solve_store_rule_evaluation ::= 
+Ltac solve_store_rule_evaluation ::=
  (* remove this when issue #[732??] is fixed, perhaps in VST 2.14 *)
   match goal with |- @upd_reptype ?cs ?t ?gfs ?v0 ?v1 = ?B =>
    let rhs := fresh "rhs" in set (rhs := B);
   match type of rhs with ?A =>
-   let a := fresh "a" in set (a:=A) in rhs; 
+   let a := fresh "a" in set (a:=A) in rhs;
     lazy beta zeta iota delta [reptype reptype_gen] in a;
     cbn in a; subst a
   end;
    let h0 := fresh "h0" in let h1 := fresh "h1" in
-   set (h0:=v0 : @reptype cs t); 
-   set (h1:=v1 : @reptype cs (@nested_field_type cs t gfs)); 
+   set (h0:=v0 : @reptype cs t);
+   set (h1:=v1 : @reptype cs (@nested_field_type cs t gfs));
     (* the next line should have (@update_reptype cs) instead of (update_reptype) *)
    change (@upd_reptype cs t gfs h0 h1 = rhs);
    remember_indexes gfs;
@@ -33,7 +33,7 @@ Ltac solve_store_rule_evaluation ::=
   repeat match goal with
             | |- context [fst (@pair ?t1 ?t2 ?A ?B)] => change (fst(@pair t1 t2 A B)) with A
             | |- context [snd(@pair ?t1 ?t2 ?A ?B)] => change (snd(@pair t1 t2 A B)) with B
-            | |-  context [@pair ?t1 ?t2 _ _] => 
+            | |-  context [@pair ?t1 ?t2 _ _] =>
                       let u1 := eval compute in t1 in
                       let u2 := eval compute in t2 in
                       progress (change_no_check t1 with u1; change_no_check t2 with u2)
@@ -42,7 +42,7 @@ Ltac solve_store_rule_evaluation ::=
   end.
 
 
-Ltac inhabited_value T ::= (* remove this when using version of VST 
+Ltac inhabited_value T ::= (* remove this when using version of VST
     in which issue #751 is resolved, presumably VST 2.14. *)
  match T with
  | nat => constr:(O)
@@ -54,10 +54,10 @@ Ltac inhabited_value T ::= (* remove this when using version of VST
                            let y := inhabited_value B in
                                constr:(pair x y)
  | _ => match goal with
-            | x:T |- _ => x 
+            | x:T |- _ => x
             | x := _ : T |- _ => x
             | _ => let t := eval unfold T in T in
-                   tryif constr_eq t T 
+                   tryif constr_eq t T
                    then fail 3 "cannot prove that type" T "is inhabited, so cannot compute deadvars.  Fix this by asserting (X:"T") above the line"
                    else inhabited_value t
             end
@@ -68,13 +68,13 @@ Lemma root_valid_int_or_ptr: forall g (roots: roots_t) root outlier,
     roots_compatible g outlier roots ->
     graph_rep g * outlier_rep outlier |-- !! (valid_int_or_ptr (root2val g root)).
 Proof.
-  intros. destruct H0. destruct root as [[? | ?] | ?].
+  intros. destruct H0. destruct root as [? | ? | ?].
   - simpl root2val. unfold odd_Z2val. replace (2 * z + 1) with (z + z + 1) by lia.
     apply prop_right, valid_int_or_ptr_ii1.
   - sep_apply (roots_outlier_rep_single_rep _ _ _ H H0).
     sep_apply (single_outlier_rep_valid_int_or_ptr g0). entailer!.
   - red in H1. rewrite Forall_forall in H1.
-    rewrite (filter_sum_right_In_iff v roots) in H.
+    rewrite (filter_proj_In_iff root_proj_vertex_spec) in H.
     apply H1 in H. simpl. sep_apply (graph_rep_valid_int_or_ptr _ _ H). entailer!.
 Qed.
 

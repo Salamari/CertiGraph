@@ -7,7 +7,7 @@ Require Import CertiGraph.CertiGC.GCGraph.
 Require Import VST.msl.wand_frame.
 Require Import CertiGraph.CertiGC.env_graph_gc.
 Require Import CertiGraph.CertiGC.spatial_gcgraph.
-Require Import CertiGraph.msl_ext.iter_sepcon. 
+Require Import CertiGraph.msl_ext.iter_sepcon.
 Require Import CertiGraph.CertiGC.gc_spec.
 Require Import CertiGraph.msl_ext.ramification_lemmas.
 Require Import CertiGraph.CertiGC.forward_lemmas.
@@ -19,13 +19,13 @@ Local Open Scope logic.
 Lemma body_forward_inR:
  forall (Espec : OracleKind)
     (rsh sh : share) (gv : globals) (g : LGraph)
-    (h: heap) (hp: val) (rootpairs: list rootpair) (roots : roots_t) 
+    (h: heap) (hp: val) (rootpairs: list rootpair) (roots : roots_t)
     (outlier : outlier_t)
-    (from to : nat) (depth : Z) (p : VType * Z)
+    (from to : nat) (depth : Z) (v : VType) (n: Z)
     (SH : readable_share rsh)
     (SH0 : writable_share sh)
     (H: super_compatible g h rootpairs roots outlier)
-    (H0 : forward_p_compatible (inr p) roots g from)
+    (H0 : forward_p_compatible (ForwardPntVertex v n) roots g from)
     (H1 : forward_condition g h from to)
     (H2 : 0 <= depth <= Int.max_signed)
     (H3 : from <> to),
@@ -34,23 +34,23 @@ Lemma body_forward_inR:
    LOCAL (temp _from_start (gen_start g from);
    temp _from_limit (limit_address g h from);
    temp _next (heap_next_address hp to);
-   temp _p (forward_p_address' (inr p) rootpairs g); 
+   temp _p (forward_p_address' (ForwardPntVertex v n) rootpairs g);
    temp _depth (Vint (Int.repr depth)))
    SEP (all_string_constants rsh gv;
-   outlier_rep outlier; graph_rep g; 
+   outlier_rep outlier; graph_rep g;
    roots_rep sh rootpairs;
    heap_rep sh h hp))
   (fn_body f_forward)
   (normal_ret_assert
      ((EX (g' : LGraph) (h': heap) (roots' : roots_t),
      PROP (super_compatible g' h' (update_rootpairs rootpairs (map (root2val g') roots')) roots' outlier;
-     roots' = upd_roots from to (inr p) g roots;
+     roots' = upd_roots from to (ForwardPntVertex v n) g roots;
        forward_relation from to (Z.to_nat depth)
-         (forward_p2forward_t (inr p) roots g) g g';
+         (forward_p2forward_t (ForwardPntVertex v n) roots g) g g';
        forward_condition g' h' from to;
        heap_relation h h')
        RETURN ( ) SEP (all_string_constants rsh gv; outlier_rep outlier;
-                  graph_rep g'; 
+                  graph_rep g';
                   roots_rep sh (update_rootpairs rootpairs (map (root2val g') roots'));
                   heap_rep sh h' hp))%argsassert
         * stackframe_of f_forward)).
@@ -61,7 +61,7 @@ abbreviate_semax.
   destruct H as [? [? [? ?]]]. destruct H1 as [? [? [? [? ?]]]].
   unfold limit_address, heap_next_address, forward_p_address'.
   (* p is Vtype * Z, ie located in graph *)
-    destruct p as [v n]. destruct H0 as [? [? [? [SCAN ?]]]].
+    destruct H0 as [? [? [? [SCAN ?]]]].
     freeze [0; 1; 3;4] FR.
     localize [vertex_rep (nth_sh g (vgeneration v)) g v].
     unfold vertex_rep, vertex_at. Intros.
@@ -85,7 +85,7 @@ abbreviate_semax.
     unfold make_fields_vals.
     rewrite H12, Znth_map; [|rewrite make_fields_eq_length; assumption].
     assert_PROP (valid_int_or_ptr (field2val (raw_tag (vlabel g v)) g (Znth n (make_fields g v)))). {
-      destruct (Znth n (make_fields g v)) eqn:?; [destruct s|].
+      destruct (Znth n (make_fields g v)) eqn:?.
       - unfold field2val.
         apply prop_right. rewrite if_true by auto.
         unfold odd_Z2val;
@@ -110,7 +110,7 @@ abbreviate_semax.
         unfold no_dangling_dst in H10.
         apply H10 with (e:=e) in H0.
         1: sep_apply (graph_rep_valid_int_or_ptr g (dst g e) H0); entailer!!.
-        unfold get_edges; rewrite <- filter_sum_right_In_iff, <- Heqf.
+        unfold get_edges; rewrite <- (filter_proj_In_iff field_proj_edge_spec), <- Heqf.
         now apply Znth_In; rewrite make_fields_eq_length. }
     forward_call (field2val (raw_tag (vlabel g v)) g (Znth n (make_fields g v))).
 
@@ -125,12 +125,12 @@ abbreviate_semax.
       rewrite data_at__memory_block.
       rewrite sizeof_tarray_int_or_ptr; [Intros; cancel | unfold gen_size].
       destruct (total_space_tight_range (nth_space h from)). assumption. }
-    destruct (Znth n (make_fields g v)) eqn:? ; [destruct s|].
+    destruct (Znth n (make_fields g v)) eqn:?.
     (* Z + GC_Pointer + EType *)
     + (* Z *)
       unfold field2val, odd_Z2val. rewrite if_true by auto. forward_if.
       1: exfalso; apply H20'; reflexivity.
-      forward. Exists g h roots. 
+      forward. Exists g h roots.
       red in H4. rewrite H4. rewrite update_rootpairs_same.
       entailer!!. split. easy.
       unfold forward_condition, heap_relation.
@@ -138,7 +138,7 @@ abbreviate_semax.
     + (* GC_Pointer *)
       destruct g0. unfold field2val, GC_Pointer2val. forward_if.
       2: exfalso; apply Int.one_not_zero; assumption.
-      forward_call (Vptr b i). 
+      forward_call (Vptr b i).
       unfold thread_info_rep, heap_rep; Intros.
       gather_SEP (graph_rep _) (heap_rest_rep _) (outlier_rep _).
       rewrite <- HeqP. destruct H5.
@@ -189,7 +189,7 @@ abbreviate_semax.
           subst. clear -H0 H10 H11 e Heqf.
           apply (H10 v H0).
           unfold get_edges;
-          rewrite <- filter_sum_right_In_iff, <- Heqf; apply Znth_In.
+          rewrite <- (filter_proj_In_iff field_proj_edge_spec), <- Heqf; apply Znth_In.
           now rewrite make_fields_eq_length.
         }
         destruct H20. rewrite <- Heqn' in H20.
@@ -209,7 +209,7 @@ abbreviate_semax.
         unfold no_dangling_dst in H10.
         clear -H10 H0 e Heqf H11. apply (H10 v H0).
         unfold get_edges.
-        rewrite <- filter_sum_right_In_iff.
+        rewrite <- (filter_proj_In_iff field_proj_edge_spec).
         rewrite <- Heqf.
         apply Znth_In.
         rewrite make_fields_eq_length; assumption.
@@ -410,7 +410,7 @@ abbreviate_semax.
               PROP ( )
               LOCAL (temp _newv nv;
                      temp _sz (if Archi.ptr64 then Vlong (Int64.repr n') else Vint (Int.repr n'));
-                     temp _hd (Z2val (make_header g v')); 
+                     temp _hd (Z2val (make_header g v'));
                      temp _v (vertex_address g v');
                      temp _from_start fp;
                      temp _from_limit (offset_val fn fp);
@@ -568,7 +568,7 @@ abbreviate_semax.
               remember (labeledgraph_gen_dst g' e v1) as g1.
               assert (0 <= n < Zlength (make_fields_vals g' v)) by
                   (subst g'; rewrite fields_eq_length, <- lcv_raw_fields; assumption).
-              assert (Znth n (make_fields g' v) = inr e) by
+              assert (Znth n (make_fields g' v) = FieldEdge e) by
                   (subst g'; unfold make_fields in *;
                    rewrite <- lcv_raw_fields; assumption).
               assert (0 <= n < Zlength (make_fields g' v)) by
@@ -619,11 +619,11 @@ abbreviate_semax.
               replace_SEP 0 (heap_rep sh h' hp).
               { unfold heap_rep. simpl heap_head. entailer!. }
               rewrite H31 in H33.
-                assert (forward_relation from to 0 (inr e) g g1) by
+                assert (forward_relation from to 0 (ForwardEdge e) g g1) by
                     (subst g1 g' v1 v'; constructor; assumption).
                 assert (In e (get_edges g v)). { (**)
                   unfold get_edges.
-                  rewrite <- filter_sum_right_In_iff.
+                  rewrite <- (filter_proj_In_iff field_proj_edge_spec).
                   rewrite <- Heqf.
                   apply (Znth_In n (make_fields g v)).
                   rewrite make_fields_eq_length. assumption.
@@ -724,10 +724,10 @@ abbreviate_semax.
                           rewrite <- lcv_graph_has_gen; assumption).
                      assert (graph_has_v g1 (new_copied_v g to)) by
                        (subst g1; rewrite <- lgd_graph_has_v;
-                       rewrite Heqg'; apply lcv_graph_has_v_new; assumption). 
+                       rewrite Heqg'; apply lcv_graph_has_v_new; assumption).
                      forward_call (rsh, sh, gv, g3, h3, hp, (update_rootpairs rootpairs (map (root2val g3) roots')), roots',
-                                   outlier, from, to, depth - 1,
-                                   (@inr Z _ (new_copied_v g to, i))).
+                                    outlier, from, to, depth - 1,
+                                    ForwardPntVertex (new_copied_v g to) i).
                      *** apply prop_right. simpl. rewrite sub_repr.
                          do 4 f_equal. rewrite H31.
                          first [rewrite sem_add_pi_ptr_special' |
@@ -793,7 +793,7 @@ abbreviate_semax.
                      rewrite Heqf, H12. simpl.
                      apply fr_e_to_not_forwarded_Sn; [reflexivity | assumption..].
                      Local Transparent super_compatible.
-                --- 
+                ---
                  assert (SCAN': raw_tag (vlabel g v') >= NO_SCAN_TAG). {
                    pose proof raw_fields_range (vlabel g v').
                    pose proof raw_color_range (vlabel g v').
@@ -862,4 +862,3 @@ abbreviate_semax.
            ++ apply hr_refl.
         -- unfold thread_info_rep, heap_rep. entailer!!.
 Qed.
-

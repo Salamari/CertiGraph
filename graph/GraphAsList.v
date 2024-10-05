@@ -36,7 +36,7 @@ Section LIST_DEF.
     intros v e x. apply (rev_ind (fun l1 => forall l2, In (v, e) (shiftLeft x (l1 ++ l2)) <-> In (v, e) (shiftLeft x l1) \/ In (v, e) (shiftLeft (tailVertex x l1) l2))).
     - intros. simpl. intuition.
     - intros. rewrite <- app_assoc, <- app_comm_cons, app_nil_l. rewrite H. destruct x0 as [e' v']. simpl. rewrite H. simpl. rewrite tailVertex_foot. intuition.
-  Qed.  
+  Qed.
 
   Fixpoint listVertices' (l: list (E * V)) : list V :=
     match l with
@@ -116,13 +116,13 @@ Section LIST_DEF.
     - subst l. remember (listEdges' r) as l. clear Heql H7. induction l; simpl. 1: apply NoDup_nil. apply NoDup_cons.
       + clear IHl. intro. rewrite in_map_iff in H7. destruct H7 as [a' [? ?]]. assert (In a (a :: l)) by apply in_eq. assert (In a' (a :: l)) by (apply in_cons; auto).
         apply H2 in H9. apply H2 in H10. destruct H9 as [? [? ?]]. destruct H10 as [? [? ?]]. assert (a = a') by (apply (H3 (src g a)); auto). subst a'.
-        rewrite NoDup_cons_iff in H0. destruct H0. clear -H0 H8. auto.        
+        rewrite NoDup_cons_iff in H0. destruct H0. clear -H0 H8. auto.
       + apply IHl.
         * rewrite NoDup_cons_iff in H0. destruct H0; auto.
         * intros. apply H2. simpl; right; auto.
     - clear -H H1 Heql. pose proof (map_length (src g) (listEdges' r)). rewrite <- Heql in *. rewrite listEdges'_length in H0. rewrite H0. intuition auto with *.
   Qed.
-  
+
   Definition listEdges (l: GList) := listEdges' (snd l).
 
 End LIST_DEF.
@@ -145,7 +145,7 @@ Section IS_LIST.
     Lemma is_list_no_loop: forall root s p, is_list root -> reachable g root s -> snd p <> nil -> ~ g |= p is s ~o~> s satisfying (fun _ => True).
   Proof.
     repeat intro. destruct H as [pf [? ?]]. apply H3 in H0. clear H3. destruct H0 as [ps [[? ?] ?]]. pose proof (reachable_by_path_merge _ _ _ _ _ _ _ H0 H2).
-    apply H3 in H5. destruct ps as [v ps]. unfold path_glue in H5. simpl in H5. inversion H5. destruct p; simpl in *. rewrite app_nil_end in H7 at 1.
+    apply H3 in H5. destruct ps as [v ps]. unfold path_glue in H5. simpl in H5. inversion H5. destruct p; simpl in *. rewrite <- app_nil_r in H7 at 1.
     apply app_inv_head in H7. auto.
   Qed.
 
@@ -165,7 +165,7 @@ Section IS_LIST.
   Lemma is_list_same_src_same_edge: forall root s e1 e2, is_list root -> reachable g root s -> src g e1 = s -> src g e2 = s -> evalid g e1 -> evalid g e2 ->
                                                          vvalid g (dst g e1) -> vvalid g (dst g e2) -> e1 = e2.
   Proof.
-    intros. assert (vvalid g s) by (apply reachable_foot_valid in H0; auto). 
+    intros. assert (vvalid g s) by (apply reachable_foot_valid in H0; auto).
     assert (g |= (s, e1 :: nil) is s ~o~> dst g e1 satisfying (fun _ => True)) by
         (split; split; simpl; auto; [split; [|unfold strong_evalid; rewrite H1] | hnf; rewrite Forall_forall; intros]; auto).
     assert (g |= (s, e2 :: nil) is s ~o~> dst g e2 satisfying (fun _ => True)) by
@@ -201,7 +201,7 @@ Section IS_LIST.
     }
     assert (g |= (v, ev :: nil) is v ~o~> d satisfying (fun _ => True)). {
       split; split; simpl; auto; [unfold strong_evalid; rewrite H11, H12; split; auto | hnf; rewrite Forall_forall; intros; auto].
-    } destruct H1 as [[vs ps] ?]. destruct H2 as [[vv pv] ?]. 
+    } destruct H1 as [[vs ps] ?]. destruct H2 as [[vv pv] ?].
     pose proof (reachable_by_path_merge _ _ _ _ _ _ _ H1 H13). unfold path_glue, fst, snd in H15.
     pose proof (reachable_by_path_merge _ _ _ _ _ _ _ H2 H14). unfold path_glue, fst, snd in H16. destruct H0 as [pf [? ?]].
     pose proof (reachable_by_path_is_reachable _ _ _ _ _ H16). apply H17 in H18. destruct H18 as [pp [[? ?] ?]]. apply H19 in H15. apply H19 in H16. rewrite H15 in H16.
@@ -531,7 +531,7 @@ Section GRAPH_TO_LIST.
           -- destruct p as [e' v']. simpl in H4. assert (x = v') by (apply (H2 e' v' r); auto). subst v'.
              rewrite shiftLeft_app in H4. rewrite tailVertex_foot in H4. destruct H4.
              ++ simpl in H0. apply H0 in H4; auto.
-             ++ simpl in H4. destruct H4. 2: exfalso; auto. inversion H4. subst v0. subst e1. auto.             
+             ++ simpl in H4. destruct H4. 2: exfalso; auto. inversion H4. subst v0. subst e1. auto.
         * intros. inversion H4.
         * intros. inversion H4. auto.
   Qed.
@@ -668,7 +668,7 @@ Section GRAPH_TO_LIST.
           -- subst e1. rewrite H13 in H16. apply (is_list_no_edge_loop g root x (dst g e0)); auto.
           -- revert H18. apply H7; auto. apply edge_reachable with (dst g e0); auto.
   Qed.
-    
+
   Definition graphToList (bound: nat) (x: Vertex) : GList Vertex Edge := (x, rev (toEdgeList (bound, x, nil))).
 
 End GRAPH_TO_LIST.

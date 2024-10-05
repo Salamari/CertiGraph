@@ -142,13 +142,12 @@ Defined.
 
 Inductive GC_Pointer := | GCPtr: block -> ptrofs -> GC_Pointer.
 
-Definition raw_field: Type := option (Z + GC_Pointer).
-  (* None means internal-heap-pointer
-     Some(inl n)  means  unboxed
-     Some(inr (GCPtr b ofs))  means  outlier
-  *)
+Inductive raw_field: Type :=
+| RawInternal (* internal-heap-pointer *)
+| RawUnboxed: Z -> raw_field (* unboxed value *)
+| RawOutlier: GC_Pointer -> raw_field. (* outlier *)
 
-#[export] Instance raw_field_inhabitant: Inhabitant raw_field := None.
+#[export] Instance raw_field_inhabitant: Inhabitant raw_field := RawInternal.
 
 Definition odd_Z2val (x: Z) : val :=
   Eval cbv delta [Archi.ptr64] match
@@ -172,7 +171,7 @@ Record raw_vertex_block : Type :=
     raw_tag_range: 0 <= raw_tag < 256;
     raw_color_range: 0 <= raw_color < 4;
     raw_fields_range: 0 < Zlength raw_fields < two_p (WORD_SIZE * 8 - 10);
-    tag_no_scan: NO_SCAN_TAG <= raw_tag -> ~ In None raw_fields;
+    tag_no_scan: NO_SCAN_TAG <= raw_tag -> ~ In RawInternal raw_fields;
     (* what's up with this? why can raw_f be None at all? *)
   }.
 
@@ -549,15 +548,18 @@ Proof. intros. unfold gen_start. if_tac; [apply start_isptr | contradiction]. Qe
 Definition vertex_address (g: LGraph) (v: VType): val :=
   offset_val (WORD_SIZE * vertex_offset g v) (gen_start g (vgeneration v)).
 
-Definition root_t: Type := Z + GC_Pointer + VType.
+Inductive root_t: Type :=
+| RootUnboxed: Z -> root_t
+| RootOutlier: GC_Pointer -> root_t
+| RootVertex: VType -> root_t.
 
-#[export] Instance root_t_inhabitant: Inhabitant root_t := inl (inl Z.zero).
+#[export] Instance root_t_inhabitant: Inhabitant root_t := RootUnboxed Z.zero.
 
 Definition root2val (g: LGraph) (fd: root_t) : val :=
   match fd with
-  | inl (inl z) => odd_Z2val z
-  | inl (inr p) => GC_Pointer2val p
-  | inr v => vertex_address g v
+  | RootUnboxed z => odd_Z2val z
+  | RootOutlier p => GC_Pointer2val p
+  | RootVertex v => vertex_address g v
   end.
 
 Definition roots_t: Type := list root_t.
@@ -696,21 +698,48 @@ Definition frames_compatible (g: LGraph) (frames: list frame) (roots: roots_t) :
 Definition fun_thread_arg_compatible
            (g: LGraph) (ti: thread_info) (fi: fun_info) (roots: roots_t) : Prop :=
   map (root2val g) roots = map ((flip Znth) ti.(ti_args)) fi.(live_roots_indices).
-*)
+  *)
+
+Definition root_proj_outlier (r : root_t): option GC_Pointer :=
+  match r with
+  | RootOutlier p => Some p
+  | _ => None
+  end.
+
+Lemma root_proj_outlier_spec: forall r p, root_proj_outlier r = Some p <-> r = RootOutlier p.
+Proof. intros. destruct r; simpl; split; intro S; inversion S; subst; reflexivity. Qed.
 
 Definition roots_outlier_compatible (roots: roots_t) (outlier: outlier_t): Prop :=
-  incl (filter_sum_right (filter_sum_left roots)) outlier.
+  incl (filter_proj root_proj_outlier roots) outlier.
+
+Definition root_proj_vertex (r : root_t): option VType :=
+  match r with
+  | RootVertex v => Some v
+  | _ => None
+  end.
+
+Lemma root_proj_vertex_spec: forall r p, root_proj_vertex r = Some p <-> r = RootVertex p.
+Proof. intros. destruct r; simpl; split; intro S; inversion S; subst; reflexivity. Qed.
 
 Definition roots_graph_compatible (roots: roots_t) (g: LGraph): Prop :=
-  Forall (graph_has_v g) (filter_sum_right roots).
+  Forall (graph_has_v g) (filter_proj root_proj_vertex roots).
 
 Definition roots_compatible (g: LGraph) (outlier: outlier_t) (roots: roots_t): Prop :=
   roots_outlier_compatible roots outlier /\ roots_graph_compatible roots g.
 
+Definition raw_proj_outlier (r : raw_field) : option GC_Pointer :=
+  match r with
+  | RawOutlier p => Some p
+  | _ => None
+  end.
+
+Lemma raw_proj_outlier_spec: forall r p, raw_proj_outlier r = Some p <-> r = RawOutlier p.
+Proof. intros. destruct r; simpl; split; intro S; inversion S; subst; reflexivity. Qed.
+
 Definition outlier_compatible (g: LGraph) (outlier: outlier_t): Prop :=
   forall v,
     graph_has_v g v ->
-    incl (filter_sum_right (filter_option (vlabel g v).(raw_fields))) outlier.
+    incl (filter_proj raw_proj_outlier (vlabel g v).(raw_fields)) outlier.
 
 Definition copy_compatible (g: LGraph): Prop :=
   forall v, graph_has_v g v -> (vlabel g v).(raw_mark) = true ->
@@ -1006,30 +1035,32 @@ Proof.
     end. simpl Z.mul in H0. rewrite two_power_nat_two_p. simpl Z.of_nat. lia.
 Qed.
 
-Definition field_t: Type := Z + GC_Pointer + EType.
-   (*   unboxed + outlier + internal-heap-pointer *)
+Inductive field_t: Type :=
+| FieldUnboxed: Z -> field_t
+| FieldOutlier: GC_Pointer -> field_t
+| FieldEdge: EType -> field_t.
 
-#[export] Instance field_t_inhabitant: Inhabitant field_t := inl (inl Z.zero).
+#[export] Instance field_t_inhabitant: Inhabitant field_t := FieldUnboxed Z.zero.
 
 Definition field2val (tag: Z) (g: LGraph) (fd: field_t) : val :=
   match fd with
-  | inl (inl z) => if zlt tag NO_SCAN_TAG then odd_Z2val z else Vlong (Int64.repr z)
-  | inl (inr p) => GC_Pointer2val p
-  | inr e => vertex_address g (dst g e)
+  | FieldUnboxed z => if zlt tag NO_SCAN_TAG then odd_Z2val z else Vlong (Int64.repr z)
+  | FieldOutlier p => GC_Pointer2val p
+  | FieldEdge e => vertex_address g (dst g e)
   end.
 
 Fixpoint make_fields' (l_raw: list raw_field) (v: VType) (n: nat): list field_t :=
   match l_raw with
   | nil => nil
-  | Some (inl z) :: l => inl (inl z) :: make_fields' l v (n + 1)
-  | Some (inr ptr) :: l => inl (inr ptr) :: make_fields' l v (n + 1)
-  | None :: l => inr (v, n) :: make_fields' l v (n + 1)
+  | RawUnboxed z :: l => FieldUnboxed z :: make_fields' l v (n + 1)
+  | RawOutlier ptr :: l => FieldOutlier ptr :: make_fields' l v (n + 1)
+  | RawInternal :: l => FieldEdge (v, n) :: make_fields' l v (n + 1)
   end.
 
 Lemma make_fields'_eq_length: forall l v n, length (make_fields' l v n) = length l.
 Proof.
   intros. revert n. induction l; intros; simpl. 1: reflexivity.
-  destruct a; [destruct s|]; simpl; rewrite IHl; reflexivity.
+  destruct a; simpl; rewrite IHl; reflexivity.
 Qed.
 
 Lemma make_fields'_eq_Zlength: forall l v n, Zlength (make_fields' l v n) = Zlength l.
@@ -1040,29 +1071,36 @@ Qed.
 Lemma make_fields'_edge_depends_on_index:
   forall n l_raw i v e,
     0 <= Z.of_nat n < Zlength l_raw ->
-    nth n (make_fields' l_raw v i) field_t_inhabitant = inr e ->
+    nth n (make_fields' l_raw v i) field_t_inhabitant = FieldEdge e ->
     e = (v, n+i)%nat.
 Proof.
   induction n as [|n' IHn'].
   - intros. destruct l_raw; try inversion H0.
-    destruct r; [destruct s|]; simpl in H0; inversion H0;
-      reflexivity.
+    destruct r; simpl in H0; inversion H0; reflexivity.
   - intro. destruct l_raw; try inversion 2.
     replace (S n' + i)%nat with (n' + S i)%nat by lia.
     specialize (IHn' l_raw (S i) v e).
     assert (0 <= Z.of_nat n' < Zlength l_raw) by
           (rewrite Zlength_cons, Nat2Z.inj_succ in H; lia).
-      assert (nth n' (make_fields' l_raw v (S i)) field_t_inhabitant = inr e) by
-        (destruct r; [destruct s|]; simpl in H2;
-        replace (i + 1)%nat with (S i) in H2 by lia; assumption).
-      destruct r; [destruct s|]; simpl; apply IHn'; assumption.
+      assert (nth n' (make_fields' l_raw v (S i)) field_t_inhabitant = FieldEdge e) by
+        (destruct r; simpl in H2; replace (i + 1)%nat with (S i) in H2 by lia; assumption).
+      destruct r; simpl; apply IHn'; assumption.
 Qed.
 
 Definition make_fields (g: LGraph) (v: VType): list field_t :=
   make_fields' (vlabel g v).(raw_fields) v O.
 
+Definition field_proj_edge (f: field_t) : option EType :=
+  match f with
+  | FieldEdge e => Some e
+  | _ => None
+  end.
+
+Lemma field_proj_edge_spec: forall r p, field_proj_edge r = Some p <-> r = FieldEdge p.
+Proof. intros. destruct r; simpl; split; intro S; inversion S; subst; reflexivity. Qed.
+
 Definition get_edges (g: LGraph) (v: VType): list EType :=
-  filter_sum_right (make_fields g v).
+  filter_proj field_proj_edge (make_fields g v).
 
 Definition pregraph_remove_vertex_and_edges
            (g: LGraph) (v: VType): PreGraph VType EType :=
@@ -1153,7 +1191,7 @@ Proof.
   intros. rewrite !Zlength_correct. f_equal. unfold make_fields_vals, make_fields.
   destruct (raw_mark (vlabel g v)).
   - destruct (raw_fields_head_cons (vlabel g v)) as [r [l [? ?]]].
-    rewrite H; simpl; destruct r; [destruct s|]; simpl;
+    rewrite H; simpl; destruct r; simpl;
       rewrite map_length, make_fields'_eq_length; reflexivity.
   - rewrite map_length, make_fields'_eq_length. reflexivity.
 Qed.
@@ -1167,7 +1205,7 @@ Qed.
 
 Lemma make_fields_Znth_edge: forall g v n e,
     0 <= n < Zlength (raw_fields (vlabel g v)) ->
-    Znth n (make_fields g v) = inr e -> e = (v, Z.to_nat n).
+    Znth n (make_fields g v) = FieldEdge e -> e = (v, Z.to_nat n).
 Proof.
   intros. rewrite <- nth_Znth in H0. 2: rewrite make_fields_eq_length; assumption.
   apply make_fields'_edge_depends_on_index in H0.
@@ -1186,8 +1224,8 @@ Proof.
 Qed.
 
 Lemma make_fields'_n_doesnt_matter: forall i l v n m gcptr,
-    nth i (make_fields' l v n) field_t_inhabitant = inl (inr gcptr) ->
-    nth i (make_fields' l v m) field_t_inhabitant = inl (inr gcptr).
+    nth i (make_fields' l v n) field_t_inhabitant = FieldOutlier gcptr ->
+    nth i (make_fields' l v m) field_t_inhabitant = FieldOutlier gcptr.
 Proof.
   intros.
   unfold make_fields' in *.
@@ -1197,15 +1235,14 @@ Proof.
   induction l.
   + intros; assumption.
   + induction i.
-    - destruct a; [destruct s|]; simpl; intros; try assumption; try inversion H.
-    - destruct a; [destruct s|]; simpl; intro;
-        apply IHl with (m:=(m+1)%nat) in H; assumption.
+    - destruct a; simpl; intros; try assumption; try inversion H.
+    - destruct a; simpl; intro; apply IHl with (m:=(m+1)%nat) in H; assumption.
 Qed.
 
 Lemma make_fields'_item_was_in_list: forall l v n gcptr,
     0 <= n < Zlength l ->
-    Znth n (make_fields' l v 0) = inl (inr gcptr) ->
-    Znth n l = Some (inr gcptr).
+    Znth n (make_fields' l v 0) = FieldOutlier gcptr ->
+    Znth n l = RawOutlier gcptr.
 Proof.
   intros.
   rewrite <- nth_Znth; rewrite <- nth_Znth in H0; [| rewrite Zlength_correct in *..];
@@ -1215,7 +1252,7 @@ Proof.
   - intros. rewrite nth_Znth in H0; try assumption.
     unfold make_fields' in H0; rewrite Znth_nil in H0; inversion H0.
   - intro n. induction (Z.to_nat n) eqn:?.
-    + intros. destruct a; [destruct s|]; simpl in *; try inversion H0; try reflexivity.
+    + intros. destruct a; simpl in *; try inversion H0; try reflexivity.
     + intros. simpl in *. clear IHn0.
       replace n0 with (Z.to_nat (Z.of_nat n0)) by apply Nat2Z.id.
       assert (0 <= Z.of_nat n0 < Zlength l). {
@@ -1224,7 +1261,7 @@ Proof.
         apply Zsucc_lt_reg; rewrite <- Nat2Z.inj_succ.
         rewrite <- Heqn0; rewrite Z2Nat.id; assumption.
       }
-      destruct a; [destruct s|]; simpl in H0; apply IHl;
+      destruct a; simpl in H0; apply IHl;
         try assumption; apply make_fields'_n_doesnt_matter with (n:=1%nat);
         rewrite Nat2Z.id; assumption.
 Qed.
@@ -1232,8 +1269,8 @@ Qed.
 Lemma make_fields_edge_unique: forall g e v1 v2 n m,
     0 <= n < Zlength (make_fields g v1) ->
     0 <= m < Zlength (make_fields g v2) ->
-    Znth n (make_fields g v1) = inr e ->
-    Znth m (make_fields g v2) = inr e ->
+    Znth n (make_fields g v1) = FieldEdge e ->
+    Znth m (make_fields g v2) = FieldEdge e ->
     n = m /\ v1 = v2.
 Proof.
   intros. unfold make_fields in *.
@@ -1259,14 +1296,14 @@ Lemma in_gcptr_outlier: forall g gcptr outlier n v,
     graph_has_v g v ->
     outlier_compatible g outlier ->
     0 <= n < Zlength (raw_fields (vlabel g v)) ->
-    Znth n (make_fields g v) = inl (inr gcptr) ->
+    Znth n (make_fields g v) = FieldOutlier gcptr ->
     In gcptr outlier.
 Proof.
   intros.
   apply H0 in H; apply H; clear H; clear H0.
   unfold make_fields in H2.
   apply make_fields'_item_was_in_list in H2; try assumption.
-  rewrite <- filter_sum_right_In_iff, <- filter_option_In_iff.
+  rewrite <- (filter_proj_In_iff raw_proj_outlier_spec).
   rewrite <- H2; apply Znth_In; assumption.
 Qed.
 
@@ -1300,7 +1337,7 @@ Proof.
                   map (field2val (raw_tag (vlabel g2 v)) g2) fl).
   - intros. rewrite H2. rewrite (vertex_address_the_same g1 g2) by assumption.
     reflexivity.
-  - apply map_ext. intros. unfold field2val. destruct a. 1: reflexivity.
+  - apply map_ext. intros. unfold field2val. destruct a; [reflexivity..|].
     rewrite H. apply vertex_address_the_same; assumption.
 Qed.
 
@@ -1391,85 +1428,89 @@ Definition lgraph_mark_copied (g: LGraph) (old new: VType): LGraph :=
 Definition lgraph_copy_v (g: LGraph) (v: VType) (to: nat): LGraph :=
   lgraph_mark_copied (lgraph_add_copied_v g v to) v (new_copied_v g to).
 
-Definition forward_t: Type := Z + GC_Pointer + VType + EType.
-  (* unboxed + outlier + root-pointer + internal-edge-pointer *)
+Inductive forward_t: Type :=
+| ForwardUnboxed: Z -> forward_t
+| ForwardOutlier: GC_Pointer -> forward_t
+| ForwardVertex: VType -> forward_t
+| ForwardEdge: EType -> forward_t.
 
 Definition root2forward (r: root_t): forward_t :=
   match r with
-  | inl (inl z) => inl (inl (inl z))
-  | inl (inr p) => inl (inl (inr p))
-  | inr v => inl (inr v)
+  | RootUnboxed z => ForwardUnboxed z
+  | RootOutlier p => ForwardOutlier p
+  | RootVertex v => ForwardVertex v
   end.
 
 Definition field2forward (f: field_t): forward_t :=
   match f with
-  | inl (inl z) => inl (inl (inl z))
-  | inl (inr p) => inl (inl (inr p))
-  | inr e => inr e
+  | FieldUnboxed z => ForwardUnboxed z
+  | FieldOutlier p => ForwardOutlier p
+  | FieldEdge e => ForwardEdge e
   end.
 
-Definition forward_p_type: Type := Z + (VType * Z).
-   (* root-number +  vertex and field-number *)
+Inductive forward_p_type: Type :=
+  | ForwardPntRoot (root_number: Z) : forward_p_type
+  | ForwardPntVertex (vertex: VType) (field_number: Z): forward_p_type.
 
 Definition forward_p2forward_t
            (p: forward_p_type) (roots: roots_t) (g: LGraph): forward_t :=
   match p with
-  | inl root_index => root2forward (Znth root_index roots)
-  | inr (v, n) => if (vlabel g v).(raw_mark) && (n =? 0)
-                  then (inl (inr (vlabel g v).(copied_vertex)))
-                  else field2forward (Znth n (make_fields g v))
+  | ForwardPntRoot root_index => root2forward (Znth root_index roots)
+  | ForwardPntVertex v n => if (vlabel g v).(raw_mark) && (n =? 0)
+                           then ForwardVertex (vlabel g v).(copied_vertex)
+                           else field2forward (Znth n (make_fields g v))
   end.
 
 Definition vertex_pos_pairs (g: LGraph) (v: VType) : list (forward_p_type) :=
-  map (fun x => inr (v, Z.of_nat x))
+  map (fun x => ForwardPntVertex v (Z.of_nat x))
       (nat_inc_list (length (raw_fields (vlabel g v)))).
 
 Inductive forward_relation (from to: nat):
   nat -> forward_t -> LGraph -> LGraph -> Prop :=
-| fr_z: forall depth z g, forward_relation from to depth (inl (inl (inl z))) g g
-| fr_p: forall depth p g, forward_relation from to depth (inl (inl (inr p))) g g
+| fr_z: forall depth z g, forward_relation from to depth (ForwardUnboxed z) g g
+| fr_p: forall depth p g, forward_relation from to depth (ForwardOutlier p) g g
 | fr_v_not_in: forall depth v g,
-    vgeneration v <> from -> forward_relation from to depth (inl (inr v)) g g
+    vgeneration v <> from -> forward_relation from to depth (ForwardVertex v) g g
 | fr_v_in_forwarded: forall depth v g,
     vgeneration v = from -> (vlabel g v).(raw_mark) = true ->
-    forward_relation from to depth (inl (inr v)) g g
+    forward_relation from to depth (ForwardVertex v) g g
 | fr_v_in_not_forwarded_O: forall v g,
     vgeneration v = from -> (vlabel g v).(raw_mark) = false ->
-    forward_relation from to O (inl (inr v)) g (lgraph_copy_v g v to)
+    forward_relation from to O (ForwardVertex v) g (lgraph_copy_v g v to)
 | fr_v_in_not_forwarded_Sn: forall depth v g g',
     vgeneration v = from -> (vlabel g v).(raw_mark) = false ->
     (vlabel g v).(raw_tag) < NO_SCAN_TAG ->
     let new_g := lgraph_copy_v g v to in
     forward_loop from to depth (vertex_pos_pairs new_g (new_copied_v g to)) new_g g' ->
-    forward_relation from to (S depth) (inl (inr v)) g g'
+    forward_relation from to (S depth) (ForwardVertex v) g g'
 | fr_v_in_not_forwarded_noscan: forall depth v g,
     vgeneration v = from -> (vlabel g v).(raw_mark) = false ->
     (vlabel g v).(raw_tag) >= NO_SCAN_TAG ->
-    forward_relation from to (S depth) (inl (inr v)) g (lgraph_copy_v g v to)
+    forward_relation from to (S depth) (ForwardVertex v) g (lgraph_copy_v g v to)
 | fr_e_not_to: forall depth e (g: LGraph),
-    vgeneration (dst g e) <> from -> forward_relation from to depth (inr e) g g
+    vgeneration (dst g e) <> from -> forward_relation from to depth (ForwardEdge e) g g
 | fr_e_to_forwarded: forall depth e (g: LGraph),
     vgeneration (dst g e) = from -> (vlabel g (dst g e)).(raw_mark) = true ->
     let new_g := labeledgraph_gen_dst g e (vlabel g (dst g e)).(copied_vertex) in
-    forward_relation from to depth (inr e) g new_g
+    forward_relation from to depth (ForwardEdge e) g new_g
 | fr_e_to_not_forwarded_O: forall e (g: LGraph),
     vgeneration (dst g e) = from -> (vlabel g (dst g e)).(raw_mark) = false ->
     let new_g := labeledgraph_gen_dst (lgraph_copy_v g (dst g e) to) e
                                       (new_copied_v g to) in
-    forward_relation from to O (inr e) g new_g
+    forward_relation from to O (ForwardEdge e) g new_g
 | fr_e_to_not_forwarded_Sn: forall depth e (g g': LGraph),
     vgeneration (dst g e) = from -> (vlabel g (dst g e)).(raw_mark) = false ->
     (vlabel g (dst g e)).(raw_tag) < NO_SCAN_TAG ->
     let new_g := labeledgraph_gen_dst (lgraph_copy_v g (dst g e) to) e
                                       (new_copied_v g to) in
     forward_loop from to depth (vertex_pos_pairs new_g (new_copied_v g to)) new_g g' ->
-    forward_relation from to (S depth) (inr e) g g'
+    forward_relation from to (S depth) (ForwardEdge e) g g'
 | fr_e_to_not_forwarded_noscan: forall depth e (g: LGraph),
     vgeneration (dst g e) = from -> (vlabel g (dst g e)).(raw_mark) = false ->
     (vlabel g (dst g e)).(raw_tag) >= NO_SCAN_TAG ->
     let new_g := labeledgraph_gen_dst (lgraph_copy_v g (dst g e) to) e
                                       (new_copied_v g to) in
-    forward_relation from to (S depth) (inr e) g new_g
+    forward_relation from to (S depth) (ForwardEdge e) g new_g
 with
 forward_loop (from to: nat): nat -> list forward_p_type -> LGraph -> LGraph -> Prop :=
 | fl_nil: forall depth g, forward_loop from to depth nil g g
@@ -1480,11 +1521,11 @@ forward_loop (from to: nat): nat -> list forward_p_type -> LGraph -> LGraph -> P
 Definition forward_p_compatible
            (p: forward_p_type) (roots: roots_t) (g: LGraph) (from: nat): Prop :=
   match p with
-  | inl root_index => 0 <= root_index < Zlength roots
-  | inr (v, n) => graph_has_v g v /\ 0 <= n < Zlength (vlabel g v).(raw_fields) /\
-                  (vlabel g v).(raw_mark) = false /\
-                  (vlabel g v).(raw_tag) < NO_SCAN_TAG /\
-                  vgeneration v <> from
+  | ForwardPntRoot root_index => 0 <= root_index < Zlength roots
+  | ForwardPntVertex v n => graph_has_v g v /\ 0 <= n < Zlength (vlabel g v).(raw_fields) /\
+                             (vlabel g v).(raw_mark) = false /\
+                             (vlabel g v).(raw_tag) < NO_SCAN_TAG /\
+                             vgeneration v <> from
   end.
 
 Fixpoint collect_Z_indices {A} (eqdec: forall (a b: A), {a = b} + {a <> b})
@@ -1545,31 +1586,31 @@ Lemma upd_roots_outlier_compatible: forall roots outlier z v,
     roots_outlier_compatible roots outlier ->
     (* forall v : VType, *)
     (*   graph_has_v g v -> *)
-    roots_outlier_compatible (upd_Znth z roots (inr v)) outlier.
+    roots_outlier_compatible (upd_Znth z roots (RootVertex v)) outlier.
 Proof.
   intros. do 2 red in H |-* . intros.
-  rewrite <- filter_sum_right_In_iff, <- filter_sum_left_In_iff in H0.
+  rewrite <- (filter_proj_In_iff root_proj_outlier_spec) in H0.
   apply In_upd_Znth in H0. destruct H0.
   inversion H0. apply H.
-  rewrite <- filter_sum_right_In_iff, <- filter_sum_left_In_iff. assumption.
+  rewrite <- (filter_proj_In_iff root_proj_outlier_spec). assumption.
 Qed.
 
 Lemma upd_Znth_graph_compatible: forall g roots z,
     roots_graph_compatible roots g ->
     forall v : VType,
       graph_has_v g v ->
-      roots_graph_compatible (upd_Znth z roots (inr v)) g.
+      roots_graph_compatible (upd_Znth z roots (RootVertex v)) g.
 Proof.
   intros. red in H |-* . rewrite Forall_forall in H |-* . intros.
-  rewrite <- filter_sum_right_In_iff in H1.
+  rewrite <- (filter_proj_In_iff root_proj_vertex_spec) in H1.
   apply In_upd_Znth in H1. destruct H1. inversion H1; assumption.
-  apply H. rewrite <- filter_sum_right_In_iff. assumption.
+  apply H. rewrite <- (filter_proj_In_iff root_proj_vertex_spec). assumption.
 Qed.
 
 Lemma upd_roots_compatible: forall g roots outlier z,
     roots_compatible g outlier roots ->
     forall v : VType, graph_has_v g v ->
-                      roots_compatible g outlier (upd_Znth z roots (inr v)).
+                      roots_compatible g outlier (upd_Znth z roots (RootVertex v)).
 Proof.
   intros. destruct H. split.
   - apply upd_roots_outlier_compatible; assumption.
@@ -1581,19 +1622,19 @@ Local Close Scope Z_scope.
 Definition upd_root (from to: nat)
            (g: LGraph) (root: root_t) : root_t :=
   match root with
-  | inl _ => root
-  | inr v => if Nat.eq_dec (vgeneration v) from
-              then if (vlabel g v).(raw_mark)
-                  then inr (vlabel g v).(copied_vertex)
-                  else inr (new_copied_v g to)
-              else root
+  | RootVertex v => if Nat.eq_dec (vgeneration v) from
+                   then if (vlabel g v).(raw_mark)
+                        then RootVertex (vlabel g v).(copied_vertex)
+                        else RootVertex (new_copied_v g to)
+                   else root
+  | _ => root
   end.
 
 Definition upd_roots (from to: nat) (forward_p: forward_p_type)
            (g: LGraph) (roots: roots_t) : roots_t :=
   match forward_p with
-  | inr _ => roots
-  | inl index => upd_Znth index roots (upd_root from to g (Znth index roots))
+  | ForwardPntVertex _ _ => roots
+  | ForwardPntRoot index => upd_Znth index roots (upd_root from to g (Znth index roots))
   end.
 
   Inductive forward_roots_relation (from to: nat): forall (roots1: roots_t) (g1: LGraph) (roots2: roots_t) (g2: LGraph), Prop :=
@@ -1881,12 +1922,12 @@ Lemma mfv_unmarked_all_is_ptr_or_int: forall (tag: Z) (g : LGraph) (v : VType),
     Forall is_pointer_or_integer (map (field2val tag g) (make_fields g v)).
 Proof.
   intros. rewrite Forall_forall. intros f ?. apply list_in_map_inv in H1.
-  destruct H1 as [x [? ?]]. destruct x as [[? | ?] | ?]; simpl in H1; subst.
+  destruct H1 as [x [? ?]]. destruct x; simpl in H1; subst.
   - if_tac; apply I.
   - destruct g0. exact I.
   - apply isptr_is_pointer_or_integer. unfold vertex_address.
     rewrite isptr_offset_val. apply graph_has_gen_start_isptr.
-    apply filter_sum_right_In_iff, H in H2; [destruct H2|]; assumption.
+    apply (filter_proj_In_iff field_proj_edge_spec), H in H2; [destruct H2|]; assumption.
 Qed.
 
 Lemma mfv_all_is_ptr_or_int: forall g v,
@@ -2037,13 +2078,13 @@ Proof.
 Qed.
 
 Lemma e_in_make_fields': forall l v n e,
-    In (inr e) (make_fields' l v n) -> exists s, e = (v, s).
+    In (FieldEdge e) (make_fields' l v n) -> exists s, e = (v, s).
 Proof.
-  induction l; intros; simpl in *. 1: exfalso; assumption. destruct a; [destruct s|].
-  - simpl in H. destruct H. 1: inversion H. apply IHl with (n + 1). assumption.
+  induction l; intros; simpl in *. 1: exfalso; assumption. destruct a.
+  - simpl in H. destruct H. 1: inversion H; now exists n. apply IHl with (n + 1). assumption.
   - simpl in H. destruct H. 1: inversion H. apply IHl with (n + 1). assumption.
   - simpl in H. destruct H.
-    + inversion H. exists n. reflexivity.
+    + inversion H.
     + apply IHl with (n + 1). assumption.
 Qed.
 
@@ -2088,19 +2129,19 @@ Proof.
     + apply NoDup_combine_r. clear H. unfold get_edges. unfold make_fields.
       remember (raw_fields (vlabel g old)). clear Heql. remember 0 as m. clear Heqm.
       revert m. induction l; intros. simpl. 1: constructor.
-      simpl. destruct a; [destruct s|]; simpl; try apply IHl. constructor.
+      simpl. destruct a; simpl; try apply IHl. constructor.
       2: apply IHl. clear.
       cut (forall a b,
-              In a (map snd (filter_sum_right (make_fields' l old b))) -> b <= a).
+              In a (map snd (filter_proj field_proj_edge (make_fields' l old b))) -> b <= a).
       * repeat intro. apply H in H0. lia.
       * induction l; intros; simpl in H. 1: exfalso; assumption.
-        destruct a; [destruct s|]; simpl in H; try (apply IHl in H; lia).
+        destruct a; simpl in H; try (apply IHl in H; lia).
         destruct H; [|apply IHl in H]; lia.
     + unfold EType. rewrite combine_length, repeat_length, !map_length, Nat.min_id.
       reflexivity.
   - apply list_in_map_inv in H. destruct H as [[x ?] [? ?]]. simpl in H. subst n0.
     assert (x = old). {
-      unfold get_edges in H0. rewrite <- filter_sum_right_In_iff in H0.
+      unfold get_edges in H0. rewrite <- (filter_proj_In_iff field_proj_edge_spec) in H0.
       unfold make_fields in H0. apply e_in_make_fields' in H0. destruct H0 as [s ?].
       inversion H. reflexivity. } subst x. remember (get_edges g old). clear Heql.
     induction l; simpl in *. 1: assumption. destruct H0.
@@ -2133,10 +2174,10 @@ Lemma lacv_field2val_make_fields_old:  forall (tag: Z) (g : LGraph) (v : VType) 
 Proof.
   intros. unfold make_fields. pose proof (graph_has_v_not_eq _ to _ H).
   rewrite lacv_vlabel_old by assumption. apply map_ext_in.
-  intros [[? | ?] | ?] ?; simpl; try reflexivity. unfold new_copied_v.
+  intros [? | ? | ?] ?; simpl; try reflexivity. unfold new_copied_v.
   rewrite pcv_dst_old.
   - apply lacv_vertex_address_old. 2: assumption. specialize (H1 _ H). apply H1.
-    unfold get_edges. rewrite <- filter_sum_right_In_iff. assumption.
+    unfold get_edges. rewrite <- (filter_proj_In_iff field_proj_edge_spec). assumption.
   - apply e_in_make_fields' in H3. destruct H3 as [s ?]. subst e. simpl. intro.
     unfold new_copied_v in H2. contradiction.
 Qed.
@@ -2179,22 +2220,21 @@ Lemma lacv_field2val_make_fields_new: forall (tag: Z) g v to,
 Proof.
   intros. unfold make_fields. rewrite lacv_vlabel_new.
   remember (raw_fields (vlabel g v)). remember 0 as n.
-  assert (forall m, In m (map snd (filter_sum_right (make_fields' l v n))) ->
+  assert (forall m, In m (map snd (filter_proj field_proj_edge (make_fields' l v n))) ->
                     In m (map snd (get_edges g v))). {
     unfold get_edges, make_fields. subst. intuition auto. }
-  clear Heql Heqn. revert n H2. induction l; intros; simpl. 1: reflexivity.
-  destruct a; [destruct s|].
-  - simpl in *. rewrite IHl; [reflexivity | assumption].
-  - simpl in *. rewrite IHl; [reflexivity | assumption].
+  clear Heql Heqn. revert n H2. induction l; intros; simpl. 1: reflexivity. destruct a.
   - simpl in *. rewrite IHl.
     + assert (In n (map snd (get_edges g v))) by (apply H2; left; reflexivity).
       f_equal. rewrite pcv_dst_new by assumption. apply lacv_vertex_address_old.
       2: assumption. red in H1. apply (H1 v). 1: assumption. apply in_map_iff in H3.
       destruct H3 as [[x ?] [? ?]]. simpl in H3. subst n0. clear -H4. pose proof H4.
-      unfold get_edges in H4. rewrite <- filter_sum_right_In_iff in H4.
+      unfold get_edges in H4. rewrite <- (filter_proj_In_iff field_proj_edge_spec) in H4.
       unfold make_fields in H4. apply e_in_make_fields' in H4. destruct H4 as [s ?].
       inversion H0. subst. assumption.
     + intros. apply H2. right; assumption.
+  - simpl in *. rewrite IHl; [reflexivity | assumption].
+  - simpl in *. rewrite IHl; [reflexivity | assumption].
 Qed.
 
 Lemma lacv_make_fields_vals_new: forall g v to,
@@ -2253,7 +2293,7 @@ Lemma lmc_field2val_make_fields: forall (tag: Z) (g : LGraph) (v new_v x: VType)
     map (field2val tag g) (make_fields g x).
 Proof.
   intros. rewrite lmc_make_fields. apply map_ext; intros.
-  destruct a; [destruct s|]; simpl; [| |rewrite lmc_vertex_address]; reflexivity.
+  destruct a; simpl; [| |rewrite lmc_vertex_address]; reflexivity.
 Qed.
 
 Lemma lmc_vlabel_not_eq: forall g v new_v x,
@@ -2355,7 +2395,7 @@ Lemma get_edges_In: forall g v s,
 Proof.
   intros. unfold get_edges, make_fields. remember (raw_fields (vlabel g v)).
   remember 0 as n. clear Heqn Heql. revert n. induction l; intros; simpl.
-  1: reflexivity. destruct a; [destruct s0 |]; simpl; rewrite IHl; try reflexivity.
+  1: reflexivity. destruct a; rewrite filter_proj_cons; simpl; rewrite IHl; try reflexivity.
   intuition auto. inversion H0. left; reflexivity.
 Qed.
 
@@ -2364,8 +2404,8 @@ Proof.
   intros g v e. unfold get_edges, make_fields. remember (raw_fields (vlabel g v)).
   remember 0 as n. clear Heqn Heql. revert n. induction l; intros; simpl in *.
   - exfalso; assumption.
-  - destruct a; [destruct s|]; simpl in *;
-      [| | destruct H; [subst e; simpl; reflexivity|]]; apply IHl in H; assumption.
+  - destruct a; rewrite filter_proj_cons in H; simpl in *;
+      [destruct H; [subst e; simpl; reflexivity|] | |]; apply IHl in H; assumption.
 Qed.
 
 Lemma lmc_no_dangling_dst: forall g old new,
@@ -2382,7 +2422,7 @@ Proof.
   intros. unfold get_edges, make_fields. rewrite lacv_vlabel_new.
   remember (raw_fields (vlabel g v)). remember 0. clear Heql Heqn. revert n.
   induction l; intros; simpl. 1: reflexivity.
-  destruct a; [destruct s|]; simpl; rewrite IHl; reflexivity.
+  destruct a; rewrite filter_proj_cons; simpl; rewrite IHl; reflexivity.
 Qed.
 
 Lemma lacv_no_dangling_dst: forall (g : LGraph) (v : VType) (to : nat),
@@ -2399,7 +2439,7 @@ Proof.
     + apply lacv_graph_has_v_old. 1: assumption. apply lacv_graph_has_v_inv in H2.
       2: assumption. destruct H2. 2: contradiction. apply (H x). 1: assumption.
       unfold get_edges in *. rewrite lacv_make_fields_not_eq in H3; assumption.
-    + unfold get_edges in H3. rewrite <- filter_sum_right_In_iff in H3.
+    + unfold get_edges in H3. rewrite <- (filter_proj_In_iff field_proj_edge_spec) in H3.
       apply e_in_make_fields' in H3. destruct H3 as [s ?]. subst e. simpl. assumption.
 Qed.
 
@@ -2647,7 +2687,7 @@ Proof. intros. destruct H0. split; [|apply lcv_rgc_unchanged]; assumption. Qed.
 Lemma lcv_roots_graph_compatible: forall g roots v to z,
     graph_has_gen g to ->
     roots_graph_compatible roots g ->
-    roots_graph_compatible (upd_Znth z roots (inr (new_copied_v g to)))
+    roots_graph_compatible (upd_Znth z roots (RootVertex (new_copied_v g to)))
                            (lgraph_copy_v g v to).
 Proof.
   intros. apply upd_Znth_graph_compatible.
@@ -2660,7 +2700,7 @@ Lemma lcv_roots_compatible: forall g roots outlier v to z,
     graph_has_gen g to ->
     roots_compatible g outlier roots ->
     roots_compatible (lgraph_copy_v g v to) outlier
-                     (upd_Znth z roots (inr (new_copied_v g to))).
+                     (upd_Znth z roots (RootVertex (new_copied_v g to))).
 Proof.
   intros. destruct H0. split.
   - apply upd_roots_outlier_compatible; assumption.
@@ -2725,7 +2765,7 @@ Lemma upd_rootpairs_compatible: forall g rootpairs roots z,
       rootpairs_compatible g
       (update_rootpairs rootpairs
             (upd_Znth z (map rp_val rootpairs) (vertex_address g v)))
-       (upd_Znth z roots (inr v)).
+       (upd_Znth z roots (RootVertex v)).
 Proof.
   intros. red in H |-* .
   assert (0 <= z < Zlength (map (root2val g) roots)) by (list_solve). clear HB.
@@ -2754,7 +2794,7 @@ Lemma lcv_rootpairs_compatible: forall
       (update_rootpairs rootpairs
         (upd_Znth z (map rp_val rootpairs)
           (vertex_address g (new_copied_v g to))))
-      (upd_Znth z roots (inr (new_copied_v g to))).
+      (upd_Znth z roots (RootVertex (new_copied_v g to))).
 Proof.
   intros. rewrite <- (lcv_vertex_address_new g v to H).
   apply upd_rootpairs_compatible; auto.
@@ -2907,7 +2947,7 @@ Lemma lcv_super_compatible: forall
       (update_rootpairs rootpairs
            (upd_Znth z (map rp_val rootpairs)
               (vertex_address g (new_copied_v g to))))
-      (upd_Znth z roots (inr (new_copied_v g to))) outlier.
+      (upd_Znth z roots (RootVertex (new_copied_v g to))) outlier.
 Proof.
   intros. destruct H1 as [? [? [? ?]]]. split; [|split; [|split]].
   - apply lcv_graph_thread_info_compatible; assumption.
@@ -3062,11 +3102,11 @@ Lemma lgd_dst_new: forall (g: LGraph) e v,
 Proof. intros. simpl. unfold updateEdgeFunc. rewrite if_true; reflexivity. Qed.
 
 Lemma lgd_f2v_eq_except_one: forall tag g fd e v',
-    fd <> (inr e) ->
+    fd <> (FieldEdge e) ->
     field2val tag g fd = field2val tag (labeledgraph_gen_dst g e v') fd.
 Proof.
   intros; unfold field2val; simpl.
-  destruct fd; [destruct s|]; try reflexivity.
+  destruct fd; try reflexivity.
   unfold updateEdgeFunc; if_tac; [exfalso; apply H; rewrite H0|]; reflexivity.
 Qed.
 
@@ -3093,7 +3133,7 @@ Qed.
 
 Lemma lgd_map_f2v_diff_vert_eq: forall tag g v v' v1 e n,
     0 <= n < Zlength (make_fields g v) ->
-    Znth n (make_fields g v) = inr e ->
+    Znth n (make_fields g v) = FieldEdge e ->
     v1 <> v ->
     map (field2val tag g) (make_fields g v1) =
     map (field2val tag (labeledgraph_gen_dst g e v'))
@@ -3106,8 +3146,7 @@ Proof.
     intros. rewrite Zlength_map in H2.
     repeat rewrite Znth_map by assumption.
     apply lgd_f2v_eq_except_one. intro.
-    pose proof (make_fields_edge_unique g e v
-                                        v1 n j H H2 H0 H3).
+    pose proof (make_fields_edge_unique g e v v1 n j H H2 H0 H3).
     destruct H4. unfold not in H1. symmetry in H5.
     apply (H1 H5).
 Qed.
@@ -3115,7 +3154,7 @@ Qed.
 Lemma lgd_f2v_eq_after_update: forall tag g v v' e n j,
   0 <= n < Zlength (make_fields g v) ->
   0 <= j < Zlength (make_fields g v) ->
-  Znth n (make_fields g v) = inr e ->
+  Znth n (make_fields g v) = FieldEdge e ->
   Znth j (upd_Znth n (map (field2val tag g)
                           (make_fields g v)) (vertex_address g v')) =
   Znth j
@@ -3144,7 +3183,7 @@ Qed.
 Lemma lgd_mfv_change_in_one_spot: forall g v e v' n,
     0 <= n < Zlength (make_fields g v) ->
     raw_mark (vlabel g v) = false ->
-    Znth n (make_fields g v) = inr e ->
+    Znth n (make_fields g v) = FieldEdge e ->
     upd_Znth n (make_fields_vals g v) (vertex_address g v') =
     (make_fields_vals (labeledgraph_gen_dst g e v') v).
 Proof.
@@ -3165,8 +3204,7 @@ Qed.
 
 Lemma lgd_no_dangling_dst: forall g e v',
     graph_has_v g v' ->
-    no_dangling_dst g ->
-     no_dangling_dst (labeledgraph_gen_dst g e v').
+    no_dangling_dst g -> no_dangling_dst (labeledgraph_gen_dst g e v').
 Proof.
   intros. unfold no_dangling_dst in *.
   intros. rewrite <- lgd_graph_has_v.
@@ -3238,7 +3276,7 @@ Lemma lgd_fun_thread_arg_compatible:
     rootpairs_compatible (labeledgraph_gen_dst g e v') rootpairs roots.
 Proof.
   intros. unfold rootpairs_compatible in *.
-  rewrite <- H. apply map_ext_in. intros. destruct a; [destruct s|]; reflexivity.
+  rewrite <- H. apply map_ext_in. intros. destruct a; reflexivity.
 Qed.
 
 Lemma lgd_outlier_compatible:
@@ -3652,12 +3690,13 @@ Proof.
                    intros; rewrite H2; apply H4].
 Qed.
 
-Lemma forward_loop_add_tail: forall from to depth l x g1 g2 g3 roots,
+Lemma forward_loop_add_tail: forall from to depth l v n g1 g2 g3 roots,
     forward_loop from to depth l g1 g2 ->
-    forward_relation from to depth (forward_p2forward_t (inr x) roots g2) g2 g3 ->
-    forward_loop from to depth (l +:: (inr x)) g1 g3.
+    forward_relation from to depth
+      (forward_p2forward_t (ForwardPntVertex v n) roots g2) g2 g3 ->
+    forward_loop from to depth (l +:: (ForwardPntVertex v n)) g1 g3.
 Proof.
-  intros. revert x g1 g2 g3 H H0. induction l; intros.
+  intros. revert v n g1 g2 g3 H H0. induction l; intros.
   - simpl. inversion H. subst. apply fl_cons with g3. 2: constructor. apply H0.
   - inversion H. subst. clear H. simpl app. apply fl_cons with g4. 1: assumption.
     apply IHl with g2; assumption.
@@ -3670,11 +3709,11 @@ Proof.
   rewrite Zlength_map, !Zlength_correct, nat_inc_list_length. reflexivity.
 Qed.
 
-#[export] Instance forward_p_type_Inhabitant: Inhabitant forward_p_type := inl 0.
+#[export] Instance forward_p_type_Inhabitant: Inhabitant forward_p_type := ForwardPntRoot 0.
 
 Lemma vpp_Znth: forall (x : VType) (g : LGraph) (i : Z),
     0 <= i < Zlength (raw_fields (vlabel g x)) ->
-    Znth i (vertex_pos_pairs g x) = inr (x, i).
+    Znth i (vertex_pos_pairs g x) = ForwardPntVertex x i.
 Proof.
   intros. unfold vertex_pos_pairs.
   assert (0 <= i < Zlength (nat_inc_list (length (raw_fields (vlabel g x))))) by
@@ -3687,7 +3726,8 @@ Qed.
 Lemma forward_loop_add_tail_vpp: forall from to depth x g g1 g2 g3 roots i,
     0 <= i < Zlength (raw_fields (vlabel g x)) ->
     forward_loop from to depth (sublist 0 i (vertex_pos_pairs g x)) g1 g2 ->
-    forward_relation from to depth (forward_p2forward_t (inr (x, i)) roots g2) g2 g3 ->
+    forward_relation from to depth
+      (forward_p2forward_t (ForwardPntVertex x i) roots g2) g2 g3 ->
     forward_loop from to depth (sublist 0 (i + 1) (vertex_pos_pairs g x)) g1 g3.
 Proof.
   intros. rewrite <- vpp_Zlength in H. rewrite sublist_last_1; [|lia..].
@@ -3709,12 +3749,11 @@ Inductive scan_vertex_for_loop (from to: nat) (v: VType):
 | svfl_nil: forall g, scan_vertex_for_loop from to v nil g g
 | svfl_cons: forall g1 g2 g3 i il,
   forward_relation
-    from to O (forward_p2forward_t (inr (v, (Z.of_nat i))) nil g1) g1 g2 ->
+    from to O (forward_p2forward_t (ForwardPntVertex v (Z.of_nat i)) nil g1) g1 g2 ->
   scan_vertex_for_loop from to v il g2 g3 ->
   scan_vertex_for_loop from to v (i :: il) g1 g3.
 
-Definition no_scan (g: LGraph) (v: VType): Prop :=
-  NO_SCAN_TAG <= (vlabel g v).(raw_tag).
+Definition no_scan (g: LGraph) (v: VType): Prop := NO_SCAN_TAG <= (vlabel g v).(raw_tag).
 
 Inductive scan_vertex_while_loop (from to: nat):
   list nat -> LGraph -> LGraph -> Prop :=
@@ -3930,13 +3969,14 @@ Proof.
 Qed.
 
 Lemma forward_p2t_inr_roots: forall v n roots g,
-    forward_p2forward_t (inr (v, n)) roots g = forward_p2forward_t (inr (v, n)) nil g.
+    forward_p2forward_t (ForwardPntVertex v n) roots g =
+      forward_p2forward_t (ForwardPntVertex v n) nil g.
 Proof. intros. simpl. reflexivity. Qed.
 
 Lemma svfl_add_tail: forall from to v l roots i g1 g2 g3,
     scan_vertex_for_loop from to v l g1 g2 ->
     forward_relation from to 0
-                     (forward_p2forward_t (inr (v, Z.of_nat i)) roots g2) g2 g3 ->
+      (forward_p2forward_t (ForwardPntVertex v (Z.of_nat i)) roots g2) g2 g3 ->
     scan_vertex_for_loop from to v (l +:: i) g1 g3.
 Proof.
   do 4 intro. revert from to v. induction l; intros; inversion H; subst.
@@ -3972,10 +4012,10 @@ Proof.
 Qed.
 
 Lemma root_in_outlier: forall (roots: roots_t) outlier p,
-    In (inl (inr p)) roots ->
-    incl (filter_sum_right (filter_sum_left roots)) outlier -> In p outlier.
+    In (RootOutlier p) roots ->
+    incl (filter_proj root_proj_outlier roots) outlier -> In p outlier.
 Proof.
-  intros. apply H0. rewrite <- filter_sum_right_In_iff, <- filter_sum_left_In_iff.
+  intros. apply H0. rewrite <- (filter_proj_In_iff root_proj_outlier_spec).
   assumption.
 Qed.
 
@@ -4112,14 +4152,13 @@ Proof.
 Qed.
 
 Definition np_roots_rel from (roots roots': roots_t) (l: list Z) : Prop :=
-  forall v j,
-  Znth j roots' = inr v ->
-    (In j l -> vgeneration v <> from) /\ (~In j l -> Znth j roots = inr v).
+  forall v j, Znth j roots' = RootVertex v ->
+         (In j l -> vgeneration v <> from) /\ (~ In j l -> Znth j roots = RootVertex v).
 
 Lemma upd_roots_not_pointing: forall from to i g roots roots',
     copy_compatible g -> roots_graph_compatible roots g -> from <> to ->
     0 <= i < Zlength roots ->
-    roots' = upd_roots from to (inl i) g roots ->
+    roots' = upd_roots from to (ForwardPntRoot i) g roots ->
     np_roots_rel from roots roots' [i].
 Proof.
   intros * ? ? ? ?. pose proof I. intros. unfold np_roots_rel. intros. simpl. unfold flip.
@@ -4131,22 +4170,25 @@ Proof.
     inversion H5. }
   unfold upd_roots, upd_root in *.
   simpl in H4. destruct (Znth i roots) eqn:? .
-  - assert (roots' = roots) by (rewrite <- Heqr, upd_Znth_unchanged in H4; auto). clear H4. subst roots'.
-    split; intros; auto. destruct H4; auto. congruence.
+  - assert (roots' = roots) by (rewrite <- Heqr, upd_Znth_unchanged in H4; auto). clear H4.
+    subst roots'. split; intros; auto. destruct H4; auto. congruence.
+  - assert (roots' = roots) by (rewrite <- Heqr, upd_Znth_unchanged in H4; auto). clear H4.
+    subst roots'. split; intros; auto. destruct H4; auto. congruence.
   - if_tac in H4.
     + destruct (raw_mark (vlabel g v0)) eqn: ?; subst; split; intros.
       * destruct H4; auto. subst.
         rewrite upd_Znth_same in H5 by auto.
         inversion H5. red in H0. rewrite Forall_forall in H0.
         assert (graph_has_v g v0). {
-          apply H0. rewrite <- filter_sum_right_In_iff, <- Heqr.
+          apply H0. rewrite <- (filter_proj_In_iff root_proj_vertex_spec), <- Heqr.
           apply Znth_In; assumption. }
         hnf in H. destruct (H _ H4 Heqb) as [_ ?]. auto.
       * assert (i<>j) by tauto. rewrite upd_Znth_diff in H5 by auto. auto.
       * destruct H4; auto. subst j. rewrite upd_Znth_same in H5 by assumption.
         inversion H5. unfold new_copied_v. simpl. auto.
       * assert (i<>j) by tauto. rewrite upd_Znth_diff in H5 by auto; auto.
-    + rewrite <- Heqr in H4. rewrite upd_Znth_unchanged in H4 by auto. subst roots'. split; intros; auto. destruct H4; auto. congruence.
+    + rewrite <- Heqr in H4. rewrite upd_Znth_unchanged in H4 by auto. subst roots'.
+      split; intros; auto. destruct H4; auto. congruence.
 Qed.
 
 Lemma np_roots_rel_cons: forall roots1 roots2 roots3 from i l,
@@ -4177,18 +4219,18 @@ Proof.
   - exact (O, O).
 Qed.
 
-Lemma fr_right_roots_graph_compatible: forall depth from to e g g' roots,
-    graph_has_gen g to -> forward_p_compatible (inr e) roots g from ->
-    forward_relation from to depth (forward_p2forward_t (inr e) [] g) g g' ->
+Lemma fr_right_roots_graph_compatible: forall depth from to v n g g' roots,
+    graph_has_gen g to -> forward_p_compatible (ForwardPntVertex v n) roots g from ->
+    forward_relation from to depth (forward_p2forward_t (ForwardPntVertex v n) [] g) g g' ->
     roots_graph_compatible roots g -> roots_graph_compatible roots g'.
 Proof.
-  intros. simpl in H1, H0. destruct e. destruct H0 as [_ [_ [? _]]]. rewrite H0 in H1.
+  intros. simpl in H1, H0. destruct H0 as [_ [_ [? _]]]. rewrite H0 in H1.
   simpl in H1. remember (fun (g: LGraph) (v: nat) (x: nat) => True) as Q.
   remember (fun g1 g2 (x: nat) => roots_graph_compatible roots g1->
                                   roots_graph_compatible roots g2) as P.
   remember (fun (x1 x2: nat) => True) as R.
   pose proof (fr_general_prop
-                depth from to (field2forward (Znth z (make_fields g v))) g g' _ Q P R).
+                depth from to (field2forward (Znth n (make_fields g v))) g g' _ Q P R).
   subst Q P R. apply H3; clear H3; intros; try assumption; try reflexivity.
   - apply H4, H3. assumption.
   - apply lcv_rgc_unchanged; assumption.
@@ -4198,7 +4240,7 @@ Lemma fl_edge_roots_graph_compatible: forall depth from to l g g' v roots,
     vgeneration v <> from ->
     graph_has_gen g to -> graph_has_v g v -> raw_mark (vlabel g v) = false ->
     forall (Htag: raw_tag (vlabel g v) < NO_SCAN_TAG),
-    forward_loop from to depth (map (fun x : nat => inr (v, Z.of_nat x)) l) g g' ->
+    forward_loop from to depth (map (fun x : nat => ForwardPntVertex v (Z.of_nat x)) l) g g' ->
     (forall i, In i l -> i < length (raw_fields (vlabel g v)))%nat ->
     roots_graph_compatible roots g -> roots_graph_compatible roots g'.
 Proof.
@@ -4231,10 +4273,11 @@ Lemma fr_roots_outlier_compatible: forall from to p g roots outlier,
     roots_outlier_compatible (upd_roots from to p g roots) outlier.
 Proof.
   intros. destruct p; simpl in *. 2: assumption.
-  assert (roots_outlier_compatible (upd_Znth z roots (Znth z roots)) outlier)
+  assert (roots_outlier_compatible
+            (upd_Znth root_number roots (Znth root_number roots)) outlier)
     by (rewrite upd_Znth_unchanged'; auto).
   unfold upd_root.
-  destruct (Znth z roots) eqn: ?; auto.
+  destruct (Znth root_number roots) eqn: ?; auto.
   if_tac; auto.
   destruct (raw_mark (vlabel g v)); apply upd_roots_outlier_compatible; assumption.
 Qed.
@@ -4248,11 +4291,12 @@ Proof.
   intros.
   unfold upd_roots, upd_root in *.
   destruct p.
-  - simpl in *. destruct (Znth z roots) eqn: ?; simpl in H2.
-    + rewrite <- Heqr. rewrite upd_Znth_unchanged'. destruct s; inversion H2; subst; assumption.
+  - simpl in *. destruct (Znth root_number roots) eqn: ?; simpl in H2.
+    + rewrite <- Heqr. rewrite upd_Znth_unchanged'. inversion H2; subst; assumption.
+    + rewrite <- Heqr. rewrite upd_Znth_unchanged'. inversion H2; subst; assumption.
     + assert (graph_has_v g v). {
         red in H4. rewrite Forall_forall in H4. apply H4.
-        rewrite <- filter_sum_right_In_iff. rewrite <- Heqr. apply Znth_In.
+        rewrite <- (filter_proj_In_iff root_proj_vertex_spec), <- Heqr. apply Znth_In.
         assumption. }
       inversion H2; destruct (Nat.eq_dec (vgeneration v) from);
         try contradiction; subst; try assumption.
@@ -4263,7 +4307,7 @@ Proof.
       * destruct (raw_mark (vlabel g v)) eqn:? . 1: inversion H9.
         apply lcv_roots_graph_compatible; assumption.
       * destruct (raw_mark (vlabel g v)) eqn:? . 1: inversion H8.
-        remember (upd_Znth z roots (inr (new_copied_v g to))) as roots'.
+        remember (upd_Znth root_number roots (RootVertex (new_copied_v g to))) as roots'.
         assert (roots_graph_compatible roots' new_g) by
             (subst; subst new_g; apply lcv_roots_graph_compatible; assumption).
         assert (raw_mark (vlabel new_g (new_copied_v g to)) = false). {
@@ -4327,16 +4371,7 @@ Qed.
 *)
 
 Definition roots_have_no_gen (roots: roots_t) (gen: nat): Prop :=
-  forall v, In (inr v) roots -> vgeneration v <> gen.
-
-Lemma Forall_filter_sum_right_cons_e:
-   forall {A}{B} (f: B -> Prop) (x: A+B) (xs: list (A+B)),
-       Forall f (filter_sum_right (x::xs)) -> Forall f (filter_sum_right xs).
-Proof.
- intros.
- destruct x; simpl in H; auto.
- inv H; auto.
-Qed.
+  forall v, In (RootVertex v) roots -> vgeneration v <> gen.
 
 Lemma frr_not_pointing: forall from to roots1 g1 roots2 g2,
     copy_compatible g1 -> roots_graph_compatible roots1 g1 -> from <> to ->
@@ -4349,7 +4384,8 @@ Proof.
   intros ? Hx; inv Hx.
   intros ? ?. destruct H6.
   - clear IHforward_roots_relation.
-    pose proof upd_roots_not_pointing from to 0 g1 (r::roots1) (upd_root from to g1 r :: roots1) H0 H2
+    pose proof upd_roots_not_pointing from to 0 g1 (r::roots1)
+      (upd_root from to g1 r :: roots1) H0 H2
         H1 ltac:(list_solve).
     simpl in H7. rewrite upd_Znth0 in H7. rewrite Znth_0_cons in H7.
     specialize (H7 (eq_refl _) v 0).
@@ -4357,14 +4393,15 @@ Proof.
     specialize (H7 H6). destruct H7.
     apply H7. constructor. auto.
   - apply IHforward_roots_relation; auto.
-  eapply fr_copy_compatible; eassumption.
-    pose proof fr_roots_graph_compatible 0 from to (inl 0) g1 g2 (r::roots1) H3 ltac:(simpl; list_solve) H0.
-  simpl in H7.
-  specialize (H7 H H1 H2).
-  rewrite upd_Znth0 in H7.
-  apply Forall_filter_sum_right_cons_e in H7; auto.
-  erewrite <- fr_graph_has_gen; eassumption.
-  list_solve.
+    eapply fr_copy_compatible; eassumption.
+    pose proof fr_roots_graph_compatible 0 from to
+      (ForwardPntRoot 0) g1 g2 (r :: roots1) H3 ltac:(simpl; list_solve) H0.
+    simpl in H7.
+    specialize (H7 H H1 H2).
+    rewrite upd_Znth0, Znth_0_cons in H7.
+    apply Forall_filter_proj_cons in H7; auto.
+    erewrite <- fr_graph_has_gen; eassumption.
+    list_solve.
 Qed.
 
 Lemma fta_compatible_reset: forall g rootpairs r gen,
@@ -4408,7 +4445,7 @@ Proof.
   specialize (H _ H1). destruct H. split.
   - rewrite graph_has_gen_reset. assumption.
   - rewrite gen_has_index_reset. split. 1: assumption.
-    rewrite <- filter_sum_right_In_iff in H1. apply H0 in H1. auto.
+    rewrite <- (filter_proj_In_iff root_proj_vertex_spec) in H1. apply H0 in H1. auto.
 Qed.
 
 Lemma roots_compatible_reset: forall g gen outlier roots,
@@ -4589,7 +4626,7 @@ Lemma fr_O_dst_unchanged_root: forall from to r g g',
     forward_relation from to O (root2forward r) g g' ->
     forall e, graph_has_v g (fst e) -> dst g e = dst g' e.
 Proof.
-  intros. destruct r; [destruct s|]; simpl in H; inversion H; subst; try reflexivity;
+  intros. destruct r; simpl in H; inversion H; subst; try reflexivity;
    (simpl; rewrite pcv_dst_old; [ reflexivity |  destruct e as [[gen vidx] eidx]];
     unfold graph_has_v in H0; unfold new_copied_v; simpl in *; destruct H0; intro;
      inversion H2; subst; red in H1; lia).
@@ -4832,16 +4869,17 @@ Proof.
 Qed.
 
 Lemma fr_O_dst_unchanged_field: forall from to v n g g',
-    forward_p_compatible (inr (v, Z.of_nat n)) [] g from ->
-    forward_relation from to O (forward_p2forward_t (inr (v, Z.of_nat n)) [] g) g g' ->
+    forward_p_compatible (ForwardPntVertex v (Z.of_nat n)) [] g from ->
+    forward_relation from to O
+      (forward_p2forward_t (ForwardPntVertex v (Z.of_nat n)) [] g) g g' ->
     forall e, graph_has_v g (fst e) -> e <> (v, n) -> dst g e = dst g' e.
 Proof.
   intros. simpl in *. destruct H as [? [? [? ?]]]. rewrite H4 in H0. simpl in H0.
   remember (Znth (Z.of_nat n) (make_fields g v)).
-  assert (forall e0, inr e0 = Znth (Z.of_nat n) (make_fields g v) -> e0 <> e). {
+  assert (forall e0, FieldEdge e0 = Znth (Z.of_nat n) (make_fields g v) -> e0 <> e). {
     intros. symmetry in H6. apply make_fields_Znth_edge in H6. 2: assumption.
     rewrite Nat2Z.id in H6. rewrite <- H6 in H2. auto. }
-  destruct f; [destruct s |]; simpl in H0; inversion H0; subst; try reflexivity.
+  destruct f; simpl in H0; inversion H0; subst; try reflexivity.
   - subst new_g. rewrite lgd_dst_old. 1: reflexivity. apply H6; assumption.
   - subst new_g. rewrite lgd_dst_old. 2: apply H6; assumption. simpl.
     rewrite pcv_dst_old. 1: reflexivity. intro. rewrite H7 in H1. destruct H1.
@@ -4999,10 +5037,10 @@ Qed.
 
 Lemma fr_O_dst_changed_field: forall from to v n g g',
     copy_compatible g -> no_dangling_dst g -> from <> to -> graph_has_gen g to ->
-    forward_p_compatible (inr (v, Z.of_nat n)) [] g from ->
-    forward_relation from to O (forward_p2forward_t (inr (v, Z.of_nat n)) [] g) g g' ->
-    forall e, Znth (Z.of_nat n) (make_fields g' v) = inr e ->
-              vgeneration (dst g' e) <> from.
+    forward_p_compatible (ForwardPntVertex v (Z.of_nat n)) [] g from ->
+    forward_relation from to O
+      (forward_p2forward_t (ForwardPntVertex v (Z.of_nat n)) [] g) g g' ->
+    forall e, Znth (Z.of_nat n) (make_fields g' v) = FieldEdge e -> vgeneration (dst g' e) <> from.
 Proof.
   intros. simpl in *. destruct H3 as [? [? [? ?]]]. rewrite H7 in H4. simpl in H4.
   assert (make_fields g v = make_fields g' v) by
@@ -5013,8 +5051,8 @@ Proof.
   rewrite Nat2Z.id in *.
   inversion H4; subst; try assumption; subst new_g; rewrite lgd_dst_new.
   - apply H in H12. 1: destruct H12; auto. specialize (H0 _ H3). apply H0.
-    unfold get_edges. rewrite <- filter_sum_right_In_iff, <- H5. apply Znth_In.
-    rewrite make_fields_eq_length. assumption.
+    unfold get_edges. rewrite <- (filter_proj_In_iff field_proj_edge_spec), <- H5.
+    apply Znth_In. rewrite make_fields_eq_length. assumption.
   - unfold new_copied_v. simpl. auto.
 Qed.
 
@@ -5026,30 +5064,29 @@ Lemma fr_O_no_dangling_dst: forall from to p g g' roots,
 Proof.
   intros. inversion H3; subst; try assumption.
   - destruct p; simpl in H5.
-    + destruct (Znth z roots) eqn:? ; [destruct s|]; simpl in H5; inversion H5.
+    + destruct (Znth root_number roots) eqn:? ; simpl in H5; inversion H5.
       subst v0. clear H5. apply lcv_no_dangling_dst; auto. red in H1.
-      rewrite Forall_forall in H1. apply H1. rewrite <- filter_sum_right_In_iff.
+      rewrite Forall_forall in H1. apply H1.
+      rewrite <- (filter_proj_In_iff root_proj_vertex_spec).
       rewrite <- Heqr. apply Znth_In. assumption.
-    + destruct p. simpl in H. destruct H as [? [? [? ?]]]. rewrite H8 in H5.
-      simpl in H5. destruct (Znth z (make_fields g v0)); [destruct s|];
-                     simpl in H5; inversion H5.
-  - subst new_g. apply lgd_no_dangling_dst_copied_vert; auto.
-    destruct p; simpl in H5.
-    + destruct (Znth z roots); [destruct s|]; simpl in H5; inversion H5.
-    + destruct p. simpl in H. destruct H as [? [? [? ?]]]. rewrite H7 in H5.
-      simpl in H5. destruct (Znth z (make_fields g v)) eqn:? ; [destruct s|];
-                     simpl in H5; inversion H5. subst e0. clear H5.
+    + simpl in H. destruct H as [? [? [? ?]]]. rewrite H8 in H5. simpl in H5.
+      destruct (Znth field_number (make_fields g vertex)); simpl in H5; inversion H5.
+  - subst new_g. apply lgd_no_dangling_dst_copied_vert; auto. destruct p; simpl in H5.
+    + destruct (Znth root_number roots); simpl in H5; inversion H5.
+    + simpl in H. destruct H as [? [? [? ?]]]. rewrite H7 in H5. simpl in H5.
+      destruct (Znth field_number (make_fields g vertex)) eqn:? ;
+        simpl in H5; inversion H5. subst e0. clear H5.
       specialize (H4 _ H). apply H4. unfold get_edges.
-      rewrite <- filter_sum_right_In_iff, <- Heqf. apply Znth_In.
+      rewrite <- (filter_proj_In_iff field_proj_edge_spec), <- Heqf. apply Znth_In.
       rewrite make_fields_eq_length. assumption.
   - subst new_g. apply lgd_no_dangling_dst. 1: apply lcv_graph_has_v_new; auto.
     apply lcv_no_dangling_dst; auto. destruct p; simpl in H5.
-    + destruct (Znth z roots); [destruct s|]; simpl in H5; inversion H5.
-    + destruct p. simpl in H. destruct H as [? [? [? ?]]]. rewrite H8 in H5.
-      simpl in H5. destruct (Znth z (make_fields g v)) eqn:? ; [destruct s|];
-                     simpl in H5; inversion H5. subst e0. clear H5.
+    + destruct (Znth root_number roots); simpl in H5; inversion H5.
+    + simpl in H. destruct H as [? [? [? ?]]]. rewrite H8 in H5. simpl in H5.
+      destruct (Znth field_number (make_fields g vertex)) eqn:? ;
+        simpl in H5; inversion H5. subst e0. clear H5.
       specialize (H4 _ H). apply H4. unfold get_edges.
-      rewrite <- filter_sum_right_In_iff, <- Heqf. apply Znth_In.
+      rewrite <- (filter_proj_In_iff field_proj_edge_spec), <- Heqf. apply Znth_In.
       rewrite make_fields_eq_length. assumption.
 Qed.
 
@@ -5060,10 +5097,11 @@ Lemma svfl_dst_changed: forall from to v l g1 g2,
     copy_compatible g1 -> no_dangling_dst g1 -> from <> to ->
     (forall i,  In i l -> i < length (raw_fields (vlabel g1 v))) -> NoDup l ->
     graph_has_gen g1 to -> scan_vertex_for_loop from to v l g1 g2 ->
-    forall e i, In i l -> Znth (Z.of_nat i) (make_fields g2 v) = inr e ->
-                vgeneration (dst g2 e) <> from.
+    forall e i, In i l -> Znth (Z.of_nat i) (make_fields g2 v) = FieldEdge e ->
+           vgeneration (dst g2 e) <> from.
 Proof.
-  intros ? ? ? ?. induction l; intros ? ? ? ? SCAN; intros;  inversion H8; subst. 1: inversion H9.
+  intros ? ? ? ?. induction l; intros ? ? ? ? SCAN; intros; inversion H8; subst.
+  1: inversion H9.
   assert (e = (v, i)). {
     apply make_fields_Znth_edge in H10. 1: rewrite Nat2Z.id in H10; assumption.
     split. 1: lia. rewrite Zlength_correct. apply inj_lt.
@@ -5104,7 +5142,8 @@ Lemma svfl_no_edge2from: forall from to v g1 g2,
       from to v (nat_inc_list (length (raw_fields (vlabel g1 v)))) g1 g2 ->
     forall e, In e (get_edges g2 v) -> vgeneration (dst g2 e) <> from.
 Proof.
-  intros ? ? ?  ? ? ? ? SCAN; intros. unfold get_edges in H7. rewrite <- filter_sum_right_In_iff in H7.
+  intros ? ? ?  ? ? ? ? SCAN; intros. unfold get_edges in H7.
+  rewrite <- (filter_proj_In_iff field_proj_edge_spec) in H7.
   apply In_Znth in H7. destruct H7 as [i [? ?]].
   rewrite <- (Z2Nat.id i) in H8 by lia. eapply svfl_dst_changed; eauto.
   - intros. rewrite nat_inc_list_In_iff in H9. assumption.
@@ -5117,13 +5156,13 @@ Qed.
 Lemma no_scan_no_edge: forall g v, no_scan g v -> get_edges g v = nil.
 Proof.
   intros. unfold no_scan in H. apply tag_no_scan in H. unfold get_edges.
-  destruct (filter_sum_right (make_fields g v)) eqn:? . 1: reflexivity. exfalso.
-  assert (In e (filter_sum_right (make_fields g v))) by (rewrite Heql; left; auto).
-  rewrite <- filter_sum_right_In_iff in H0. clear l Heql. apply H. clear H.
-  unfold make_fields in H0. remember (raw_fields (vlabel g v)). clear Heql.
+  destruct (filter_proj field_proj_edge (make_fields g v)) eqn:? . 1: reflexivity. exfalso.
+  assert (In e (e :: l)) by (left; auto).
+  rewrite <- Heql, <- (filter_proj_In_iff field_proj_edge_spec) in H0. clear l Heql.
+  apply H. clear H. unfold make_fields in H0. remember (raw_fields (vlabel g v)). clear Heql.
   remember O. clear Heqn. revert n H0. induction l; simpl; intros; auto.
-  destruct a; [destruct s|]; simpl in H0;
-    [right; destruct H0; [inversion H | eapply IHl; eauto]..|left]; auto.
+  destruct a; simpl in H0;
+    [left | right; destruct H0; [inversion H | eapply IHl; eauto]..]; auto.
 Qed.
 
 Lemma svfl_copy_compatible: forall from to v l g1 g2,
@@ -5259,18 +5298,18 @@ Proof.
   apply IHforward_roots_relation; clear IHforward_roots_relation.
   - rewrite <- fr_graph_has_gen; eauto.
   - eapply fr_copy_compatible; eauto.
-  - pose proof fr_roots_graph_compatible 0 from to (inl 0%Z) g1 g2 (r::roots1).
+  - pose proof fr_roots_graph_compatible 0 from to (ForwardPntRoot 0%Z) g1 g2 (r :: roots1).
     simpl in H6. rewrite upd_Znth0, Znth_0_cons in H6.
     spec H6; auto. spec H6; [list_solve| ].
-    repeat (spec H6;[ auto  |]).
-    apply Forall_filter_sum_right_cons_e in H6; auto.
-  - apply (fr_O_no_dangling_dst from to (inl 0%Z) g1 g2 (r::roots1)); auto; simpl; try list_solve.
+    repeat (spec H6; [auto |]).
+    apply Forall_filter_proj_cons in H6; auto.
+  - apply (fr_O_no_dangling_dst from to (ForwardPntRoot 0%Z) g1 g2 (r :: roots1)); auto;
+      simpl; try list_solve.
 Qed.
 
 Lemma frr_dsr_no_edge2gen: forall from to roots roots' g g1 g2,
     graph_has_gen g to -> from <> to -> gen_unmarked g to ->
     copy_compatible g -> no_dangling_dst g ->
-(*    Zlength roots = Zlength (live_roots_indices f_info) -> *)
     roots_graph_compatible roots g ->
     forward_roots_relation from to roots g roots' g1 ->
     do_scan_relation from to (number_of_vertices (nth_gen g to)) g1 g2 ->
@@ -5543,9 +5582,9 @@ Lemma fta_compatible_add: forall g rootpairs gi roots,
     rootpairs_compatible (lgraph_add_new_gen g gi) rootpairs roots.
 Proof.
   intros. unfold rootpairs_compatible in *. simpl. rewrite <- H. clear H.
-  apply map_ext_in. intros. destruct a; [destruct s|]; simpl; try reflexivity.
+  apply map_ext_in. intros. destruct a; simpl; try reflexivity.
   apply ang_vertex_address_old. red in H0. rewrite Forall_forall in H0. apply H0.
-  rewrite <- filter_sum_right_In_iff. assumption.
+  rewrite <- (filter_proj_In_iff root_proj_vertex_spec). assumption.
 Qed.
 
 Lemma super_compatible_add: forall g ti gi sp i (Hs: 0 <= i < MAX_SPACES) roots out,
@@ -5602,9 +5641,9 @@ Proof.
           map (field2val (raw_tag (vlabel g v)) (lgraph_add_new_gen g gi))
               (make_fields (lgraph_add_new_gen g gi) v)). {
     unfold make_fields. simpl. apply map_ext_in. intros.
-    destruct a; [destruct s|]; simpl; auto. rewrite ang_vertex_address_old; auto.
+    destruct a; simpl; auto. rewrite ang_vertex_address_old; auto.
     red in H1. apply (H1 v); auto. unfold get_edges.
-    rewrite <- filter_sum_right_In_iff. assumption. } rewrite <- H2.
+    rewrite <- (filter_proj_In_iff field_proj_edge_spec). assumption. } rewrite <- H2.
   destruct (raw_mark (vlabel g v)) eqn:?; auto. f_equal.
   rewrite ang_vertex_address_old; auto. destruct (H0 _ H Heqb). assumption.
 Qed.

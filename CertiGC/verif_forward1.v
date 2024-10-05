@@ -7,7 +7,7 @@ Require Import CertiGraph.CertiGC.GCGraph.
 Require Import VST.msl.wand_frame.
 Require Import CertiGraph.CertiGC.env_graph_gc.
 Require Import CertiGraph.CertiGC.spatial_gcgraph.
-Require Import CertiGraph.msl_ext.iter_sepcon. 
+Require Import CertiGraph.msl_ext.iter_sepcon.
 Require Import CertiGraph.CertiGC.gc_spec.
 Require Import CertiGraph.msl_ext.ramification_lemmas.
 Require Import CertiGraph.CertiGC.forward_lemmas.
@@ -25,7 +25,7 @@ Lemma body_forward_inL:
       (depth z : Z)
       (SH : readable_share rsh) (SH0 : writable_share sh)
       (H: super_compatible g h rootpairs roots outlier)
-      (H0 : forward_p_compatible (inl z) roots g from)
+      (H0 : forward_p_compatible (ForwardPntRoot z) roots g from)
       (H1 : forward_condition g h from to)
       (H2 : 0 <= depth <= Int.max_signed)
       (H3 : from <> to),
@@ -34,23 +34,23 @@ Lemma body_forward_inL:
    LOCAL (temp _from_start (gen_start g from);
    temp _from_limit (limit_address g h from);
    temp _next (heap_next_address hp to);
-   temp _p (forward_p_address' (inl z) rootpairs g); 
+   temp _p (forward_p_address' (ForwardPntRoot z) rootpairs g);
    temp _depth (Vint (Int.repr depth)))
    SEP (all_string_constants rsh gv;
-   outlier_rep outlier; graph_rep g; 
+   outlier_rep outlier; graph_rep g;
    roots_rep sh rootpairs;
    heap_rep sh h hp))
   (fn_body f_forward)
   (normal_ret_assert
      ((EX (g' : LGraph) (h': heap) (roots' : roots_t),
        PROP (super_compatible g' h' (update_rootpairs rootpairs (map (root2val g') roots')) roots' outlier;
-       roots' = upd_roots from to (inl z) g roots;
+       roots' = upd_roots from to (ForwardPntRoot z) g roots;
        forward_relation from to (Z.to_nat depth)
-         (forward_p2forward_t (inl z) roots g) g g';
+         (forward_p2forward_t (ForwardPntRoot z) roots g) g g';
        forward_condition g' h' from to;
        heap_relation h h')
-       RETURN ( ) SEP (all_string_constants rsh gv; outlier_rep outlier; 
-                  graph_rep g'; 
+       RETURN ( ) SEP (all_string_constants rsh gv; outlier_rep outlier;
+                  graph_rep g';
                   roots_rep sh (update_rootpairs rootpairs (map (root2val g') roots'));
                   heap_rep sh h' hp))%argsassert
         * stackframe_of f_forward)).
@@ -67,15 +67,15 @@ abbreviate_semax.
   red in H0.
   pose proof (Znth_In _ _ H0).
   rewrite <- Heqroot in H13.
-     assert (forall v, In (inr v) roots -> isptr (vertex_address g v)). { (**)
+     assert (forall v, In (RootVertex v) roots -> isptr (vertex_address g v)). { (**)
       intros. destruct H5. unfold vertex_address. red in H15.
       rewrite Forall_forall in H15.
-      rewrite (filter_sum_right_In_iff v roots) in H14. apply H15 in H14.
+      rewrite (filter_proj_In_iff root_proj_vertex_spec) in H14. apply H15 in H14.
       destruct H14. apply graph_has_gen_start_isptr in H14. simpl in H14.
       remember (gen_start g (vgeneration v)) as vv. destruct vv; try contradiction.
       simpl. exact I. }
   assert (is_pointer_or_integer (root2val g root)). {
-    destruct root as [[? | ?] | ?]; simpl; auto.
+    destruct root as [? | ? | ?]; simpl; auto.
     - destruct g0. simpl. exact I.
     - specialize (H14 _ H13). apply isptr_is_pointer_or_integer. assumption. }
   red in H4.
@@ -86,7 +86,7 @@ abbreviate_semax.
   rewrite <- H4. rewrite Znth_map by list_solve.
   Intros.
   pose proof I.
-  forward. 
+  forward.
     assert_PROP (valid_int_or_ptr (root2val g root)). {
       gather_SEP (graph_rep _) (outlier_rep _).
       sep_apply (root_valid_int_or_ptr _ _ _ _ H13 H5). entailer!!. }
@@ -102,7 +102,7 @@ abbreviate_semax.
       rewrite data_at__memory_block.
       rewrite sizeof_tarray_int_or_ptr; [Intros; cancel | unfold gen_size].
       destruct (total_space_tight_range (nth_space h from)). assumption. }
-    destruct root as [[? | ?] | ?]; simpl root2val.
+    destruct root as [? | ? | ?]; simpl root2val.
     + unfold odd_Z2val. forward_if.
       1: exfalso; apply H20'; reflexivity.
       forward. Exists g h roots. rewrite H4, update_rootpairs_same.
@@ -111,10 +111,10 @@ abbreviate_semax.
         unfold upd_root. rewrite <- Heqroot, -> Heqroot, upd_Znth_unchanged'; auto.
         rewrite <- Heqroot.
         split3. constructor. easy. split; reflexivity.
-      * unfold roots_rep. 
+      * unfold roots_rep.
         rewrite (sepcon_isolate_nth _ _ z) by list_solve.
         fold OTHER_ROOTS.
-        apply derives_refl'; f_equal. f_equal. 
+        apply derives_refl'; f_equal. f_equal.
         rewrite <- Znth_map, <- H4, Znth_map, <- Heqroot by list_solve. reflexivity.
     + unfold GC_Pointer2val. destruct g0. forward_if.
       2: exfalso; apply Int.one_not_zero in H20; assumption.
@@ -151,19 +151,19 @@ abbreviate_semax.
         -- split3; [| |split3]; simpl; try rewrite <- Heqroot;
            [easy | | constructor | hnf; intuition | split; reflexivity ].
              unfold upd_root. rewrite  Heqroot. rewrite upd_Znth_unchanged'; auto.
-        -- unfold roots_rep. 
+        -- unfold roots_rep.
         rewrite (sepcon_isolate_nth _ _ z) by list_solve.
         fold OTHER_ROOTS.
         unfold heap_rep.
         cancel.
-        apply derives_refl'; f_equal. 
+        apply derives_refl'; f_equal.
         rewrite <- Znth_map, <- H4, Znth_map, <- Heqroot by list_solve. reflexivity.
     + assert (OTHER_ROOTS * data_at sh int_or_ptr_type (vertex_address g v) (rp_adr (Znth z rootpairs))
-              |-- roots_rep sh 
-                  (update_rootpairs rootpairs 
+              |-- roots_rep sh
+                  (update_rootpairs rootpairs
                      (upd_Znth z (map rp_val rootpairs) (vertex_address g v)))). {
               unfold roots_rep.
-              rewrite (sepcon_isolate_nth _ _ z) 
+              rewrite (sepcon_isolate_nth _ _ z)
                   by (rewrite Zlength_update_rootpairs; list_solve).
               rewrite !Znth_update_rootpairs by list_solve.
               rewrite upd_Znth_same by list_solve.
@@ -172,7 +172,7 @@ abbreviate_semax.
               unfold OTHER_ROOTS.
               apply derives_refl'. f_equal.
               rewrite Zlength_update_rootpairs by list_solve.
-              f_equal; apply Znth_eq_ext; 
+              f_equal; apply Znth_eq_ext;
                rewrite ?Zlength_update_rootpairs, ?Zlength_sublist by list_solve.
                1,3: rewrite Zlength_sublist by (rewrite ?Zlength_update_rootpairs; list_solve); auto.
                1,2: intros;  rewrite ?Znth_sublist by lia;
@@ -191,7 +191,7 @@ abbreviate_semax.
       replace_SEP 0 ((weak_derives P (memory_block fsh fn fp * TT) && emp) * P) by
           (entailer; assumption). clear H19. Intros. assert (graph_has_v g v). {
         destruct H5. red in H19. rewrite Forall_forall in H19. apply H19.
-        rewrite <- filter_sum_right_In_iff. assumption. }
+        rewrite <- (filter_proj_In_iff root_proj_vertex_spec). assumption. }
       assert (P |-- (weak_derives P (valid_pointer (Vptr b i) * TT) && emp) * P). {
         apply weak_derives_strong. subst. sep_apply (graph_rep_vertex_rep g v H19).
         Intros shh. unfold vertex_rep, vertex_at. remember (make_fields_vals g v).
@@ -244,8 +244,8 @@ abbreviate_semax.
              rewrite H21. entailer!!. }
            unlocalize [graph_rep g]. 1: apply (graph_vertex_ramif_stable _ _ H19).
            thaw FR.
-           unfold roots_rep. 
-           rewrite (sepcon_isolate_nth _ _ z) 
+           unfold roots_rep.
+           rewrite (sepcon_isolate_nth _ _ z)
            by (rewrite Zlength_update_rootpairs; list_solve).
            rewrite !Znth_update_rootpairs by list_solve.
            rewrite upd_Znth_same by list_solve.
@@ -254,7 +254,7 @@ abbreviate_semax.
            replace (sublist (Z.succ z) _ _) with (sublist (Z.succ z) (Zlength rootpairs) rootpairs).
            replace (sublist 0 z _) with (sublist 0 z rootpairs).
            2,3:
-                apply Znth_eq_ext; 
+                apply Znth_eq_ext;
              rewrite ?Zlength_update_rootpairs, ?Zlength_sublist by list_solve;
              rewrite ?Zlength_sublist by (rewrite ?Zlength_update_rootpairs; list_solve); auto;
              intros;  rewrite ?Znth_sublist by lia;
@@ -267,16 +267,16 @@ abbreviate_semax.
            forward.
            pose (cv := copied_vertex (vlabel g v)).
            pose (rootvals' := upd_Znth z (map (root2val g) roots) (vertex_address g cv)).
-           pose (roots' := upd_Znth z roots (inr cv)).
+           pose (roots' := upd_Znth z roots (RootVertex cv)).
            pose (rootpairs' := update_rootpairs rootpairs (map (root2val g) roots')).
            Exists g h roots'.
            fold rootpairs'.
            entailer!!.
-           2:{ 
+           2:{
           unfold heap_rep.
-           cancel.          
-          assert (Zlength rootpairs' = Zlength rootpairs) 
-            by (unfold rootpairs', roots'; apply Zlength_update_rootpairs; list_solve). 
+           cancel.
+          assert (Zlength rootpairs' = Zlength rootpairs)
+            by (unfold rootpairs', roots'; apply Zlength_update_rootpairs; list_solve).
           unfold roots_rep.
           rewrite (sepcon_isolate_nth _ _ z) by list_solve.
           rewrite H24.
@@ -289,7 +289,7 @@ abbreviate_semax.
           subst OTHER_ROOTS.
           apply derives_refl'.
              f_equal. f_equal;
-             apply Znth_eq_ext; 
+             apply Znth_eq_ext;
              rewrite ?Zlength_update_rootpairs, ?Zlength_sublist by list_solve;
              rewrite ?Zlength_sublist by (rewrite ?Zlength_update_rootpairs; list_solve); auto;
              intros;  rewrite ?Znth_sublist by lia;
@@ -355,7 +355,7 @@ abbreviate_semax.
            rewrite <- Heqsp_to. thaw FR. simpl snd. simpl fst.
            gather_SEP (data_at _ heap_type _ _)
                       (heap_rest_rep _).
-           replace_SEP 0 (heap_rep sh 
+           replace_SEP 0 (heap_rep sh
                         (cut_heap h (Z.of_nat to)
                                     (vertex_size g v) Hi Hh)
                          hp). {
@@ -561,11 +561,11 @@ abbreviate_semax.
               rewrite <- H38.
               Intros.
               forward.
-              assert (data_at sh int_or_ptr_type nv (rp_adr (Znth z fr')) * OTHER_ROOTS 
-                        |-- roots_rep sh (update_rootpairs rootpairs 
+              assert (data_at sh int_or_ptr_type nv (rp_adr (Znth z fr')) * OTHER_ROOTS
+                        |-- roots_rep sh (update_rootpairs rootpairs
                                (upd_Znth z (map rp_val rootpairs) nv))). {
                   unfold roots_rep.
-                  rewrite (sepcon_isolate_nth _ _ z) by 
+                  rewrite (sepcon_isolate_nth _ _ z) by
                      (rewrite Zlength_update_rootpairs; list_solve).
                   rewrite ?Znth_update_rootpairs by list_solve;
                   simpl. rewrite upd_Znth_same by list_solve.
@@ -586,13 +586,13 @@ abbreviate_semax.
               drop_LOCAL 10%nat. clear fr'. do 2 drop_LOCAL 0%nat.
               set (rootpairs' := update_rootpairs _ _).
               rewrite H30 in H32.
-              assert (forward_relation from to 0 (inl (inr v)) g g') by
+              assert (forward_relation from to 0 (ForwardVertex v) g g') by
                   (subst g'; constructor; assumption).
               assert (forward_condition g' h' from to). {
                 subst g' h' from.
                 apply lcv_forward_condition; try assumption.
                 red. intuition. }
-              remember (upd_Znth z roots (inr (new_copied_v g to))) as roots'.
+              remember (upd_Znth z roots (RootVertex (new_copied_v g to))) as roots'.
               assert (super_compatible g' h' rootpairs'  roots' outlier). {
                 subst g' h' rootpairs' roots'. rewrite H30, H32.
                  apply lcv_super_compatible; try assumption.
@@ -686,7 +686,7 @@ abbreviate_semax.
                      set (rootpairs3 := update_rootpairs _ _) in H45|-*.
                      forward_call (rsh, sh, gv, g3, h3, hp, rootpairs3, roots',
                                    outlier, from, to, depth - 1,
-                                   (@inr Z _ (new_copied_v g to, i))).
+                                   ForwardPntVertex (new_copied_v g to) i).
                      +++ apply prop_right. simpl. rewrite sub_repr, H30.
                          do 4 f_equal.
                          first [rewrite sem_add_pi_ptr_special' |
@@ -783,9 +783,9 @@ abbreviate_semax.
                    auto.
                  } clear H43.
                  forward.
-                 Exists g' h'  (upd_Znth z roots (inr (new_copied_v g to))).
+                 Exists g' h'  (upd_Znth z roots (RootVertex (new_copied_v g to))).
                  subst rootpairs'. rewrite <- Heqroots'.
-                 assert (upd_Znth z (map rp_val rootpairs) nv = (map (root2val g') roots')). { 
+                 assert (upd_Znth z (map rp_val rootpairs) nv = (map (root2val g') roots')). {
                   subst g' nv. rewrite Heqroots'. rewrite <- upd_Znth_map.
                   simpl root2val. rewrite <- H4.
                   apply Znth_eq_ext. list_solve. intros.
@@ -799,7 +799,7 @@ abbreviate_semax.
                   apply graph_has_v_in_closure.
                   clear - H44 H43 H5. destruct H5 as [_ ?].
                   red in H. rewrite Forall_forall in H. apply H.
-                  apply filter_sum_right_In_iff. rewrite <- H44.
+                  apply (filter_proj_In_iff root_proj_vertex_spec). rewrite <- H44.
                   apply Znth_In; auto.
                  } rewrite H43.
                  entailer!!.
@@ -809,10 +809,10 @@ abbreviate_semax.
                  apply fr_v_in_not_forwarded_noscan; easy.
               ** assert (depth = 0) by lia. subst depth. clear H42.
                  clear Heqnv. forward.
-                 Exists g' h' (upd_Znth z roots (inr (new_copied_v g to))).
+                 Exists g' h' (upd_Znth z roots (RootVertex (new_copied_v g to))).
                  subst rootpairs'.
                  rewrite <- Heqroots'.
-                 assert (upd_Znth z (map rp_val rootpairs) nv = (map (root2val g') roots')). { 
+                 assert (upd_Znth z (map rp_val rootpairs) nv = (map (root2val g') roots')). {
                   subst g' nv. rewrite Heqroots'. rewrite <- upd_Znth_map.
                   simpl root2val. rewrite <- H4.
                   apply Znth_eq_ext. list_solve. intros.
@@ -826,11 +826,11 @@ abbreviate_semax.
                   apply graph_has_v_in_closure.
                   clear - H42 H30 H5. destruct H5 as [_ ?].
                   red in H. rewrite Forall_forall in H. apply H.
-                  apply filter_sum_right_In_iff. rewrite <- H42.
+                  apply (filter_proj_In_iff root_proj_vertex_spec). rewrite <- H42.
                   apply Znth_In; auto.
                  }
                  rewrite H42.
-                 entailer!!. 
+                 entailer!!.
                  unfold upd_roots, upd_root. simpl. rewrite <- Heqroot.
                  rewrite if_true by auto. rewrite H21. split; auto.
       * forward_if. 1: exfalso; apply H21'; reflexivity.
@@ -860,5 +860,3 @@ abbreviate_semax.
            rewrite Znth_map by lia. auto.
            rewrite <- Heqroot. reflexivity.
 Qed.
-
-

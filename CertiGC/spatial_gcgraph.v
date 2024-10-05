@@ -995,8 +995,8 @@ Proof.
 Qed.
 
 Lemma roots_outlier_rep_single_rep: forall (roots: roots_t) outlier p,
-    In (inl (inr p)) roots ->
-    incl (filter_sum_right (filter_sum_left roots)) outlier ->
+    In (RootOutlier p) roots ->
+    incl (filter_proj root_proj_outlier roots) outlier ->
     outlier_rep outlier |-- single_outlier_rep p * TT.
 Proof. intros. apply outlier_rep_single_rep. eapply root_in_outlier; eauto. Qed.
 
@@ -1018,8 +1018,8 @@ Proof.
 Qed.
 
 Lemma roots_outlier_rep_valid_pointer: forall (roots: roots_t) outlier p,
-    In (inl (inr p)) roots ->
-    incl (filter_sum_right (filter_sum_left roots)) outlier ->
+    In (RootOutlier p) roots ->
+    incl (filter_proj root_proj_outlier roots) outlier ->
     outlier_rep outlier |-- valid_pointer (GC_Pointer2val p) * TT.
 Proof. intros. apply outlier_rep_valid_pointer. eapply root_in_outlier; eauto. Qed.
 
@@ -1440,7 +1440,7 @@ Qed.
 
 Lemma lgd_vertex_rep_eq_in_diff_vert: forall sh g v' v v1 e n,
     0 <= n < Zlength (make_fields g v) ->
-    Znth n (make_fields g v) = inr e ->
+    Znth n (make_fields g v) = FieldEdge e ->
     v1 <> v ->
     vertex_rep sh g v1 = vertex_rep sh (labeledgraph_gen_dst g e v') v1.
 Proof.
@@ -1455,7 +1455,7 @@ Qed.
 
 Lemma lgd_gen_rep_eq_in_diff_gen: forall (g : LGraph) (v v' : VType) (x : nat) e n,
     0 <= n < Zlength (make_fields g v) ->
-    Znth n (make_fields g v) = inr e ->
+    Znth n (make_fields g v) = FieldEdge e ->
     x <> vgeneration v ->
      generation_rep g x = generation_rep (labeledgraph_gen_dst g e v') x.
 Proof.
@@ -1476,7 +1476,7 @@ Qed.
 
 Lemma graph_gen_lgd_ramif: forall g v v' e n,
     0 <= n < Zlength (make_fields g v) ->
-    Znth n (make_fields g v) = inr e ->
+    Znth n (make_fields g v) = FieldEdge e ->
     graph_has_gen g (vgeneration v) ->
     graph_rep g |-- generation_rep g (vgeneration v) *
     (generation_rep (labeledgraph_gen_dst g e v') (vgeneration v) -*
@@ -1498,7 +1498,7 @@ Qed.
 Lemma gen_vertex_lgd_ramif: forall g gen index new_v v n e,
     gen_has_index g gen index ->
 0 <= n < Zlength (make_fields g v) ->
-       Znth n (make_fields g v) = inr e ->
+       Znth n (make_fields g v) = FieldEdge e ->
        v = (gen, index) ->
     generation_rep g gen |-- vertex_rep (nth_sh g gen) g (gen, index) *
     (vertex_rep (nth_sh g gen) (labeledgraph_gen_dst g e new_v)
@@ -1526,7 +1526,7 @@ Qed.
 
 Lemma graph_vertex_lgd_ramif: forall g v e v' n,
     0 <= n < Zlength (make_fields g v) ->
-    Znth n (make_fields g v) = inr e ->
+    Znth n (make_fields g v) = FieldEdge e ->
     graph_has_v g v ->
     graph_rep g |-- vertex_rep (nth_sh g (vgeneration v)) g v *
     (vertex_rep (nth_sh g (vgeneration v))
@@ -2058,31 +2058,30 @@ Lemma sepcon_isolate_nth: forall {A} `{INH: Inhabitant A} (P: A -> mpred) (al: l
    list_solve.
 Qed.
 
-Definition forward_p_address
-(p: forward_p_type) (ti: thread_info) (g: LGraph) :=
-match p with
-| inl root_index => frame_root_address (ti_frames ti) root_index
-| inr (v, n) => offset_val (WORD_SIZE * n) (vertex_address g v)
-end.
+Definition forward_p_address (p: forward_p_type) (ti: thread_info) (g: LGraph) :=
+  match p with
+  | ForwardPntRoot root_index => frame_root_address (ti_frames ti) root_index
+  | ForwardPntVertex v n => offset_val (WORD_SIZE * n) (vertex_address g v)
+  end.
 
 Definition limit_address g t_info from :=
-offset_val (WORD_SIZE * gen_size t_info from) (gen_start g from).
+  offset_val (WORD_SIZE * gen_size t_info from) (gen_start g from).
 
 Definition next_address t_info to :=
-field_address heap_type
-     [StructField _next;
-        ArraySubsc (Z.of_nat to); StructField _spaces] (ti_heap_p t_info).
+  field_address heap_type
+    [StructField _next;
+     ArraySubsc (Z.of_nat to); StructField _spaces] (ti_heap_p t_info).
 
 Definition heap_next_address (hp: val) (to: nat) :=
-field_address heap_type
-[StructField _next; ArraySubsc (Z.of_nat to); StructField _spaces]
-hp.
+  field_address heap_type
+    [StructField _next; ArraySubsc (Z.of_nat to); StructField _spaces]
+    hp.
 
 Definition forward_p_address' (p: forward_p_type) (rootpairs: list rootpair) (g: LGraph) :=
-match p with
-| inl root_index => rp_adr (Znth root_index rootpairs)
-| inr (v,n) => offset_val (WORD_SIZE * n) (vertex_address g v)
-end.
+  match p with
+  | ForwardPntRoot root_index => rp_adr (Znth root_index rootpairs)
+  | ForwardPntVertex v n => offset_val (WORD_SIZE * n) (vertex_address g v)
+  end.
 
 Lemma frames_rep_ptr_or_null: forall sh frames,
   frames_rep sh frames |-- !! is_pointer_or_null (frames_p frames).

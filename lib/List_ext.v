@@ -1080,48 +1080,12 @@ Proof.
     + simpl in H0. destruct H0; exfalso; auto.
 Qed.
 
-Fixpoint filter_sum_left {A B} (l: list (A + B)) : list A :=
-  match l with
-  | nil => nil
-  | inl x :: l' => x :: filter_sum_left l'
-  | inr _ :: l' => filter_sum_left l'
-  end.
-
-Fixpoint filter_sum_right {A B} (l: list (A + B)) : list B :=
-  match l with
-  | nil => nil
-  | inl _ :: l' => filter_sum_right l'
-  | inr x :: l' => x :: filter_sum_right l'
-  end.
-
 Fixpoint filter_option {A} (l: list (option A)) : list A :=
   match l with
   | nil => nil
   | Some x :: l' => x :: filter_option l'
   | None :: l' => filter_option l'
   end.
-
-Lemma filter_sum_right_In_iff {A B}: forall e (l: list (A + B)),
-    In (inr e) l <-> In e (filter_sum_right l).
-Proof.
-  intros. induction l; simpl; intuition auto with *.
-  - inversion H2.
-  - inversion H2. simpl. left; reflexivity.
-  - simpl in H1. destruct H1.
-    + subst b. left; reflexivity.
-    + right. apply H0. assumption.
-Qed.
-
-Lemma filter_sum_left_In_iff {A B}: forall e (l: list (A + B)),
-    In (inl e) l <-> In e (filter_sum_left l).
-Proof.
-  intros. induction l; simpl; intuition auto with *.
-  - inversion H2. simpl. left; reflexivity.
-  - simpl in H1. destruct H1.
-    + subst a0. left; reflexivity.
-    + right. apply H0. assumption.
-  - inversion H2.
-Qed.
 
 Lemma filter_option_In_iff {A}: forall e (l: list (option A)),
     In (Some e) l <-> In e (filter_option l).
@@ -1132,6 +1096,41 @@ Proof.
     + subst a. left; reflexivity.
     + right. apply H0. assumption.
   - inversion H2.
+Qed.
+
+Definition filter_proj {A B: Type} (proj: A -> option B) (l: list A) : list B :=
+  filter_option (map proj l).
+
+Lemma filter_proj_cons: forall {A B: Type} (proj: A -> option B) a (l: list A),
+    filter_proj proj (a :: l) =
+      match proj a with
+      | Some b => b :: filter_proj proj l
+      | None => filter_proj proj l
+      end.
+Proof. intros. unfold filter_proj. simpl. reflexivity. Qed.
+
+Lemma filter_proj_In_iff {A B: Type} {embed: B -> A} {proj: A -> option B}:
+  (forall a b, proj a = Some b <-> a = embed b) ->
+  forall e l, In (embed e) l <-> In e (filter_proj proj l).
+Proof.
+  intros. unfold filter_proj. rewrite <- filter_option_In_iff, in_map_iff. split; intros.
+  - exists (embed e). split; auto. rewrite H. reflexivity.
+  - destruct H0 as [a [? ?]]. rewrite H in H0. subst. assumption.
+Qed.
+
+Lemma Forall_filter_proj_cons:
+   forall {A B} (proj: A -> option B) (f: B -> Prop) (x: A) (xs: list A),
+       Forall f (filter_proj proj (x :: xs)) -> Forall f (filter_proj proj xs).
+Proof.
+ intros. rewrite filter_proj_cons in H. destruct (proj x); auto.
+ inversion H; subst. assumption.
+Qed.
+
+Lemma filter_proj_app: forall {A B: Type} (proj: A -> option B) (l1 l2: list A),
+    filter_proj proj (l1 ++ l2) = filter_proj proj l1 ++ filter_proj proj l2.
+Proof.
+  intros A B proj l1. induction l1; intros; simpl; auto. rewrite !filter_proj_cons.
+  destruct (proj a); [simpl; rewrite IHl1; reflexivity | apply IHl1].
 Qed.
 
 Lemma combine_nth_lt {A B}: forall (l1: list A) (l2: list B) n x y,
