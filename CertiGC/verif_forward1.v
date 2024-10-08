@@ -34,7 +34,7 @@ Lemma body_forward_inL:
    LOCAL (temp _from_start (gen_start g from);
    temp _from_limit (limit_address g h from);
    temp _next (heap_next_address hp to);
-   temp _p (forward_p_address' (ForwardPntRoot z) rootpairs g);
+   temp _p (forward_p_address (ForwardPntRoot z) rootpairs g);
    temp _depth (Vint (Int.repr depth)))
    SEP (all_string_constants rsh gv;
    outlier_rep outlier; graph_rep g;
@@ -59,7 +59,7 @@ intros.
 simpl fn_body.
 abbreviate_semax.
   destruct H as [? [? [? ?]]]. destruct H1 as [? [? [? [? ?]]]].
-  unfold limit_address, next_address, forward_p_address.
+  unfold limit_address, next_address.
   assert (Zlength rootpairs = Zlength roots)
      by (apply (@f_equal (list val) Z (@Zlength val)) in H4;  list_solve).
   pose (H12 := True).
@@ -141,7 +141,7 @@ abbreviate_semax.
         change (Vptr b i) with (GC_Pointer2val (GCPtr b i)) in v.
         pose proof (generation_share_writable (nth_gen g from)).
         change (generation_sh (nth_gen g from)) with (nth_sh g from) in H19.
-        rewrite <- Heqfsh in H19. unfold generation_data_at_.
+        rewrite <- Heqfsh in H19.
         sep_apply (single_outlier_rep_memory_block_FF (GCPtr b i) fp gn fsh H19 v).
         assert_PROP False by entailer!. contradiction.
       * forward_if. 1: exfalso; apply H19'; reflexivity.
@@ -150,7 +150,7 @@ abbreviate_semax.
         entailer!!.
         -- split3; [| |split3]; simpl; try rewrite <- Heqroot;
            [easy | | constructor | hnf; intuition | split; reflexivity ].
-             unfold upd_root. rewrite  Heqroot. rewrite upd_Znth_unchanged'; auto.
+             unfold upd_root. rewrite Heqroot. rewrite upd_Znth_unchanged'; auto.
         -- unfold roots_rep.
         rewrite (sepcon_isolate_nth _ _ z) by list_solve.
         fold OTHER_ROOTS.
@@ -400,7 +400,7 @@ abbreviate_semax.
            thaw FR. freeze [0; 1; 2; 3; 4; 5] FR. rename i into j.
            remember (Zlength (raw_fields (vlabel g v))) as n.
            assert (isptr nv) by (subst nv; rewrite isptr_offset_val; assumption).
-           set (p_addr := forward_p_address' _ _ _).
+           set (p_addr := forward_p_address _ _ _).
            remember (field_address heap_type
                                    [StructField _next; ArraySubsc (Z.of_nat to);
                                     StructField _spaces] hp) as n_addr.
@@ -553,7 +553,7 @@ abbreviate_semax.
               set (fr' := update_rootpairs _ _).
               assert (rp_adr (Znth z fr') = rp_adr (Znth z rootpairs)).
                 {subst fr'. rewrite Znth_update_rootpairs by list_solve. reflexivity. }
-              unfold forward_p_address'.
+              unfold forward_p_address.
               unfold roots_rep.
               rewrite (sepcon_isolate_nth _ _ z)
                  by (unfold fr'; rewrite Zlength_update_rootpairs;  list_solve).

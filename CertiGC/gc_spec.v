@@ -18,7 +18,7 @@ Definition init_data2byte (d: init_data) : byte :=
   end.
 
 Definition is_string_constant (d: ident * globdef Clight.fundef type) : bool :=
-  match d with 
+  match d with
   | (_, Gvar {| gvar_info := Tarray (Tint I8 _ _) _ _;
              gvar_init := _; gvar_readonly := true; gvar_volatile := _ |})
      => true
@@ -36,7 +36,7 @@ Definition all_string_constants' (sh: share) (gv: globals) : mpred :=
   (map (sep_of_string_constant sh gv) (filter is_string_constant gc_stack.global_definitions))
   emp.
 
-Definition all_string_constants (sh: share) (gv: globals) : mpred := 
+Definition all_string_constants (sh: share) (gv: globals) : mpred :=
   ltac:(
    let x := constr:(all_string_constants' sh gv) in
    let x := eval hnf in x in
@@ -191,7 +191,7 @@ Definition forward_spec :=
     PARAMS (gen_start g from;
            limit_address g h from;
            heap_next_address hp to;
-           forward_p_address' forward_p rootpairs g;
+           forward_p_address forward_p rootpairs g;
            Vint (Int.repr depth))
     GLOBALS ()
     SEP (all_string_constants rsh gv;
@@ -303,7 +303,7 @@ Definition do_scan_spec :=
 Definition do_generation_spec :=
   DECLARE _do_generation
   WITH rsh: share, sh: share, gv: globals,
-       g: LGraph, h: heap, hp: val, fr: list frame, 
+       g: LGraph, h: heap, hp: val, fr: list frame,
        roots: roots_t, outlier: outlier_t, from: nat, to: nat
   PRE [tptr space_type,
        tptr space_type,
@@ -410,7 +410,7 @@ Definition resume_spec :=
          graph_rep g;
          thread_info_rep sh t_info ti)
   POST [tvoid]
-    PROP (Ptrofs.unsigned (ti_nalloc t_info) <= 
+    PROP (Ptrofs.unsigned (ti_nalloc t_info) <=
            total_space (heap_head (ti_heap t_info))
           - used_space (heap_head (ti_heap t_info)))
     RETURN ()
@@ -443,7 +443,7 @@ Definition garbage_collect_spec :=
           garbage_collect_condition g' (ti_heap t_info');
           safe_to_copy g';
           frame_shells_eq (ti_frames t_info) (ti_frames t_info');
-          Ptrofs.unsigned (ti_nalloc t_info) <= 
+          Ptrofs.unsigned (ti_nalloc t_info) <=
                  total_space (heap_head (ti_heap t_info'))
                     - used_space (heap_head (ti_heap t_info')))
     RETURN ()
@@ -472,11 +472,11 @@ Definition free_heap_spec :=
   DECLARE _free_heap
   WITH h: heap, p: val, rsh: share, gv: globals
   PRE [tptr heap_type]
-    PROP (readable_share rsh) PARAMS (p) GLOBALS (gv) 
-    SEP (heap_rep Ews h p; ti_token_rep h p; 
+    PROP (readable_share rsh) PARAMS (p) GLOBALS (gv)
+    SEP (heap_rep Ews h p; ti_token_rep h p;
          mem_mgr gv; all_string_constants rsh gv)
   POST [tvoid]
-  PROP () RETURN () 
+  PROP () RETURN ()
   SEP (mem_mgr gv; all_string_constants rsh gv).
 *)
 

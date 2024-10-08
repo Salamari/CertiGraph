@@ -2058,12 +2058,6 @@ Lemma sepcon_isolate_nth: forall {A} `{INH: Inhabitant A} (P: A -> mpred) (al: l
    list_solve.
 Qed.
 
-Definition forward_p_address (p: forward_p_type) (ti: thread_info) (g: LGraph) :=
-  match p with
-  | ForwardPntRoot root_index => frame_root_address (ti_frames ti) root_index
-  | ForwardPntVertex v n => offset_val (WORD_SIZE * n) (vertex_address g v)
-  end.
-
 Definition limit_address g t_info from :=
   offset_val (WORD_SIZE * gen_size t_info from) (gen_start g from).
 
@@ -2077,7 +2071,7 @@ Definition heap_next_address (hp: val) (to: nat) :=
     [StructField _next; ArraySubsc (Z.of_nat to); StructField _spaces]
     hp.
 
-Definition forward_p_address' (p: forward_p_type) (rootpairs: list rootpair) (g: LGraph) :=
+Definition forward_p_address (p: forward_p_type) (rootpairs: list rootpair) (g: LGraph) :=
   match p with
   | ForwardPntRoot root_index => rp_adr (Znth root_index rootpairs)
   | ForwardPntVertex v n => offset_val (WORD_SIZE * n) (vertex_address g v)

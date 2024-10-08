@@ -34,7 +34,7 @@ Lemma body_forward_inR:
    LOCAL (temp _from_start (gen_start g from);
    temp _from_limit (limit_address g h from);
    temp _next (heap_next_address hp to);
-   temp _p (forward_p_address' (ForwardPntVertex v n) rootpairs g);
+   temp _p (forward_p_address (ForwardPntVertex v n) rootpairs g);
    temp _depth (Vint (Int.repr depth)))
    SEP (all_string_constants rsh gv;
    outlier_rep outlier; graph_rep g;
@@ -59,7 +59,7 @@ intros.
 simpl fn_body.
 abbreviate_semax.
   destruct H as [? [? [? ?]]]. destruct H1 as [? [? [? [? ?]]]].
-  unfold limit_address, heap_next_address, forward_p_address'.
+  unfold limit_address, heap_next_address, forward_p_address.
   (* p is Vtype * Z, ie located in graph *)
     destruct H0 as [? [? [? [SCAN ?]]]].
     freeze [0; 1; 3;4] FR.
