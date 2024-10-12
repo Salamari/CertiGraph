@@ -1518,6 +1518,34 @@ forward_loop (from to: nat): nat -> list forward_p_type -> LGraph -> LGraph -> P
     forward_relation from to depth (forward_p2forward_t f nil g1) g1 g2 ->
     forward_loop from to depth fl g2 g3 -> forward_loop from to depth (f :: fl) g1 g3.
 
+Ltac raw_mark_contra :=
+  lazymatch goal with
+  | H1: ?A = true, H2: ?A = false |- _ => rewrite H1 in H2; discriminate
+  end.
+
+Lemma forward_relation_unique: forall from to depth p g g1 g2,
+    forward_relation from to depth p g g1 ->
+    forward_relation from to depth p g g2 -> g1 = g2.
+Proof.
+  intros from to depth. induction depth; intros.
+  - inversion H; subst; inversion H0; subst; try reflexivity;
+      try contradiction; raw_mark_contra.
+  - assert (forall l lg lg1 lg2,
+               forward_loop from to depth l lg lg1 ->
+               forward_loop from to depth l lg lg2 -> lg1 = lg2). {
+      clear -IHdepth. induction l; intros.
+      - inversion H; subst. inversion H0; subst. reflexivity.
+      - inversion H; subst. inversion H0; subst.
+        assert (g0 = g2) by (eapply IHdepth; eassumption). subst g0.
+        eapply IHl; eassumption. }
+    clear IHdepth. inversion H; subst; inversion H0; subst;
+      try reflexivity; try contradiction; try raw_mark_contra.
+    + assert (new_g = new_g0) by (subst; reflexivity). rewrite <- H2 in H10.
+        eapply H1; eassumption.
+    + assert (new_g = new_g0) by (subst; reflexivity). rewrite <- H2 in H10.
+        eapply H1; eassumption.
+Qed.
+
 Definition forward_p_compatible
            (p: forward_p_type) (roots: roots_t) (g: LGraph) (from: nat): Prop :=
   match p with
