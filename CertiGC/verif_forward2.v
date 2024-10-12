@@ -359,14 +359,12 @@ abbreviate_semax.
                       h (Z.of_nat to) (vertex_size g v') Hi Hh Hn).
            rewrite <- Heqsp_to. thaw FR. simpl fst. simpl snd.
            gather_SEP (data_at _ _ _ _) (heap_rest_rep _).
-           replace_SEP 0 (heap_rep sh (cut_heap h _ _ Hi Hh) hp). {
+           replace_SEP 0 (heap_rep sh (cut_heap h (Z.of_nat to) (vertex_size g v')) hp). {
              entailer!!.
              unfold heap_rep, heap_struct_rep.
              apply sepcon_derives; [ | apply derives_refl].
-             apply derives_refl'; f_equal.
-             unfold space_tri at 2. simpl spaces.
-             rewrite <- upd_Znth_map. f_equal.
-             }
+             apply derives_refl'; f_equal. unfold_cut_heap. simpl. unfold_cut_space.
+             unfold space_tri at 2. rewrite <- upd_Znth_map. f_equal. }
            sep_apply (graph_vertex_ramif_stable _ _ H19). Intros.
            freeze [1; 2; 3; 4] FR. rewrite v0.
            remember (nth_sh g from) as shv.
@@ -610,8 +608,7 @@ abbreviate_semax.
               remember (new_copied_v g to).
               remember (labeledgraph_gen_dst g' e v1) as g1.
               thaw FR.
-              remember (cut_heap h (Z.of_nat to) (vertex_size g v') Hi Hh)
-                as h'.
+              remember (cut_heap h (Z.of_nat to) (vertex_size g v')) as h'.
               unfold heap_rep. Intros.
               gather_SEP
                 (heap_struct_rep _ _ _)
@@ -631,11 +628,10 @@ abbreviate_semax.
                 assert (forward_condition g1 h' from to). {
                   subst g1 g' h' from v'.
                   apply lgd_forward_condition; try assumption.
-                  apply lcv_forward_condition_unchanged; try assumption.
+                  apply lcv_forward_condition; try assumption.
                   red. intuition. }
                 remember roots as roots'.
                 assert (super_compatible g1 h' rootpairs roots' outlier). {
-
                   subst g1 g' h' roots'.
                   apply lgd_super_compatible, lcv_super_compatible_unchanged;
                     try assumption.

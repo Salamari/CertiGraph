@@ -189,10 +189,10 @@ Definition forward_spec :=
           0 <= depth <= Int.max_signed;
           from <> to)
     PARAMS (gen_start g from;
-           limit_address g h from;
-           heap_next_address hp to;
-           forward_p_address forward_p rootpairs g;
-           Vint (Int.repr depth))
+            limit_address g h from;
+            heap_next_address hp to;
+            forward_p_address forward_p rootpairs g;
+            Vint (Int.repr depth))
     GLOBALS ()
     SEP (all_string_constants rsh gv;
          outlier_rep outlier;

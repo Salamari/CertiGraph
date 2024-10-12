@@ -355,16 +355,12 @@ abbreviate_semax.
            rewrite <- Heqsp_to. thaw FR. simpl snd. simpl fst.
            gather_SEP (data_at _ heap_type _ _)
                       (heap_rest_rep _).
-           replace_SEP 0 (heap_rep sh
-                        (cut_heap h (Z.of_nat to)
-                                    (vertex_size g v) Hi Hh)
-                         hp). {
+           replace_SEP 0 (heap_rep sh (cut_heap h (Z.of_nat to) (vertex_size g v)) hp). {
              entailer!!.
              unfold heap_rep, heap_struct_rep.
-             apply sepcon_derives; [ | apply derives_refl].
-             apply derives_refl'; f_equal.
-             unfold space_tri at 2. simpl spaces.
-             rewrite <- upd_Znth_map. f_equal.
+             apply sepcon_derives; [ | apply derives_refl]. unfold_cut_heap. simpl spaces.
+             apply derives_refl'; f_equal. unfold_cut_space.
+             unfold space_tri at 2. rewrite <- upd_Znth_map. f_equal.
            }
            sep_apply (graph_vertex_ramif_stable _ _ H19). Intros.
            freeze [1; 2; 3; 4; 5] FR. rewrite v0.
@@ -548,8 +544,7 @@ abbreviate_semax.
                 with (lgraph_copy_v g v to) in *.
               remember (lgraph_copy_v g v to) as g'. rewrite <- H30 in *. thaw FR.
               forward_call (nv). subst p_addr.
-              remember (cut_heap h (Z.of_nat to) (vertex_size g v) Hi Hh)
-                as h'.
+              remember (cut_heap h (Z.of_nat to) (vertex_size g v)) as h'.
               set (fr' := update_rootpairs _ _).
               assert (rp_adr (Znth z fr') = rp_adr (Znth z rootpairs)).
                 {subst fr'. rewrite Znth_update_rootpairs by list_solve. reflexivity. }
@@ -599,8 +594,8 @@ abbreviate_semax.
                   split3; auto. }
               assert (heap_relation h h'). {
                 subst h'. split; intros m.
-                - simpl. rewrite utiacti_gen_size. reflexivity.
-                - simpl. rewrite utiacti_space_start. reflexivity. }
+                - simpl. rewrite cti_gen_size. reflexivity.
+                - simpl. rewrite cti_space_start. reflexivity. }
               forward_if.
               ** forward_if.
                  assert (SCAN': raw_tag (vlabel g v) < NO_SCAN_TAG). {

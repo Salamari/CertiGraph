@@ -1175,7 +1175,7 @@ Lemma heap_rest_rep_cut: forall (h: heap) i s (H1: 0 <= i < Zlength (spaces h))
     data_at_ (space_sh (Znth i (spaces h))) (tarray int_or_ptr_type s)
              (offset_val (WORD_SIZE * used_space (Znth i (spaces h)))
                          (space_start (Znth i (spaces h)))) *
-    heap_rest_rep (cut_heap h i s H1 H2).
+    heap_rest_rep (cut_heap h i s).
 Proof.
   intros. unfold heap_rest_rep.
   pose proof (split3_full_length_list
@@ -1185,14 +1185,14 @@ Proof.
   remember (skipn (Z.to_nat (i + 1)) (spaces h)) as l2.
   assert (Zlength l1 = i). {
     rewrite Zlength_length by lia. subst l1. apply firstn_length_le.
-    rewrite Zlength_correct in H1. rep_lia. }
+    rewrite Zlength_correct in H1. rep_lia. } unfold_cut_heap. simpl.
   rewrite H0 at 5. rewrite (upd_Znth_char _ _ _ _ _ H3).
   rewrite H0 at 1. rewrite !iter_sepcon_app_sepcon. simpl.
   remember (data_at_ (space_sh (Znth i (spaces h))) (tarray int_or_ptr_type s)
                      (offset_val (WORD_SIZE * used_space (Znth i (spaces h)))
                                  (space_start (Znth i (spaces h))))) as P.
   rewrite (sepcon_comm P), sepcon_assoc. f_equal.
-  rewrite (sepcon_comm _ P), <- sepcon_assoc. f_equal.
+  rewrite (sepcon_comm _ P), <- sepcon_assoc. f_equal. unfold_cut_space.
   unfold space_rest_rep. simpl. do 2 rewrite if_false by assumption.
   red in H2. subst P. remember (Znth i (spaces h)) as sp.
   rewrite (data_at__tarray_value _ _ _ _ H2). rewrite offset_offset_val.
