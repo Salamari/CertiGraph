@@ -1463,7 +1463,56 @@ Definition forward_p2forward_t
 
 Definition vertex_pos_pairs (g: LGraph) (v: VType) : list (forward_p_type) :=
   map (fun x => ForwardPntVertex v (Z.of_nat x))
-      (nat_inc_list (length (raw_fields (vlabel g v)))).
+    (nat_inc_list (length (raw_fields (vlabel g v)))).
+
+Definition has_space (sp: space) (s: Z): Prop :=
+  0 <= s <= total_space sp - used_space sp.
+
+Lemma has_space_dec: forall sp s, {has_space sp s} + {~ has_space sp s}.
+Proof.
+  intros. unfold has_space. destruct (Z_le_dec 0 s).
+  - destruct (Z_le_dec s (total_space sp - used_space sp)).
+    + left. split; assumption.
+    + right. lia.
+  - right. lia.
+Qed.
+
+Lemma cut_space_order: forall (sp : space) (s : Z),
+    has_space sp s -> 0 <= used_space sp + s <= total_space sp.
+Proof. intros. pose proof (space_order sp). red in H. lia. Qed.
+
+Definition cut_space (sp: space) (s: Z): space :=
+  match has_space_dec sp s with
+  | left H => Build_space (space_start sp) (used_space sp + s) (total_space sp)
+               (space_sh sp) (cut_space_order sp s H) (space_upper_bound sp)
+  | right _ => sp
+  end.
+
+Ltac unfold_cut_space := unfold cut_space; destruct (has_space_dec _ _); [| contradiction].
+
+Lemma cut_heap_size: forall (h : heap) (i s : Z) ,
+    0 <= i < Zlength (spaces h) ->
+    Zlength (upd_Znth i (spaces h) (cut_space (Znth i (spaces h)) s)) = MAX_SPACES.
+Proof. intros. rewrite upd_Znth_Zlength; [apply spaces_size | assumption]. Qed.
+
+Lemma spaces_index_dec: forall i h,
+    { 0 <= i < Zlength (spaces h) } + { ~ 0 <= i < Zlength (spaces h) }.
+Proof.
+  intros. destruct (Z_le_dec 0 i).
+  - destruct (Z_lt_dec i (Zlength (spaces h))).
+    + left; split; assumption.
+    + right. lia.
+  - right. lia.
+Qed.
+
+Definition cut_heap (h: heap) (i s: Z): heap :=
+  match spaces_index_dec i h with
+  | left H => Build_heap (upd_Znth i (spaces h) (cut_space (Znth i (spaces h)) s))
+               (cut_heap_size h i s H)
+  | right _ => h
+  end.
+
+Ltac unfold_cut_heap := unfold cut_heap; destruct (spaces_index_dec _ _); [|contradiction].
 
 Inductive forward_relation (from to: nat):
   nat -> forward_t -> LGraph -> LGraph -> Prop :=
@@ -1866,55 +1915,6 @@ Definition forward_condition g t_info from to: Prop :=
   enough_space_to_copy g t_info from to /\
   graph_has_gen g from /\ graph_has_gen g to /\
   copy_compatible g /\ no_dangling_dst g.
-
-Definition has_space (sp: space) (s: Z): Prop :=
-  0 <= s <= total_space sp - used_space sp.
-
-Lemma has_space_dec: forall sp s, {has_space sp s} + {~ has_space sp s}.
-Proof.
-  intros. unfold has_space. destruct (Z_le_dec 0 s).
-  - destruct (Z_le_dec s (total_space sp - used_space sp)).
-    + left. split; assumption.
-    + right. lia.
-  - right. lia.
-Qed.
-
-Lemma cut_space_order: forall (sp : space) (s : Z),
-    has_space sp s -> 0 <= used_space sp + s <= total_space sp.
-Proof. intros. pose proof (space_order sp). red in H. lia. Qed.
-
-Definition cut_space (sp: space) (s: Z): space :=
-  match has_space_dec sp s with
-  | left H => Build_space (space_start sp) (used_space sp + s) (total_space sp)
-               (space_sh sp) (cut_space_order sp s H) (space_upper_bound sp)
-  | right _ => sp
-  end.
-
-Ltac unfold_cut_space := unfold cut_space; destruct (has_space_dec _ _); [| contradiction].
-
-Lemma cut_heap_size: forall (h : heap) (i s : Z) ,
-    0 <= i < Zlength (spaces h) ->
-    Zlength (upd_Znth i (spaces h) (cut_space (Znth i (spaces h)) s)) = MAX_SPACES.
-Proof. intros. rewrite upd_Znth_Zlength; [apply spaces_size | assumption]. Qed.
-
-Lemma spaces_index_dec: forall i h,
-    { 0 <= i < Zlength (spaces h) } + { ~ 0 <= i < Zlength (spaces h) }.
-Proof.
-  intros. destruct (Z_le_dec 0 i).
-  - destruct (Z_lt_dec i (Zlength (spaces h))).
-    + left; split; assumption.
-    + right. lia.
-  - right. lia.
-Qed.
-
-Definition cut_heap (h: heap) (i s: Z): heap :=
-  match spaces_index_dec i h with
-  | left H => Build_heap (upd_Znth i (spaces h) (cut_space (Znth i (spaces h)) s))
-               (cut_heap_size h i s H)
-  | right _ => h
-  end.
-
-Ltac unfold_cut_heap := unfold cut_heap; destruct (spaces_index_dec _ _); [|contradiction].
 
 Lemma upd_Znth_tl {A}: forall (i: Z) (l: list A) (x: A),
     0 <= i -> l <> nil -> tl (upd_Znth (i + 1) l x) = upd_Znth i (tl l) x.
