@@ -1567,6 +1567,48 @@ forward_loop (from to: nat): nat -> list forward_p_type -> LGraph -> LGraph -> P
     forward_relation from to depth (forward_p2forward_t f nil g1) g1 g2 ->
     forward_loop from to depth fl g2 g3 -> forward_loop from to depth (f :: fl) g1 g3.
 
+Definition forward_gh_loop (f: nat -> nat -> nat -> forward_t -> LGraph -> heap -> LGraph * heap)
+  (from to dep: nat) (l: list forward_p_type) (gh: LGraph * heap) :=
+  fold_left (fun (gnh: LGraph * heap) fp =>
+               let (gg, hh) := gnh in
+               f from to dep (forward_p2forward_t fp nil gg) gg hh) l gh.
+
+Fixpoint forward_graph_and_heap (from to depth: nat) (f: forward_t)
+  (g: LGraph) (h: heap) : (LGraph * heap) :=
+  match f with
+  | ForwardUnboxed _
+  | ForwardOutlier _  => (g, h)
+  | ForwardVertex v =>
+      if Nat.eq_dec (vgeneration v) from
+      then if (vlabel g v).(raw_mark)
+           then (g, h)
+           else let new_g := lgraph_copy_v g v to in
+                let new_h := cut_heap h (Z.of_nat to) (vertex_size g v) in
+                match depth with
+                | O => (new_g, new_h)
+                | S n => if Z_lt_ge_dec (vlabel g v).(raw_tag) NO_SCAN_TAG
+                        then  forward_gh_loop forward_graph_and_heap from to n
+                               (vertex_pos_pairs new_g (new_copied_v g to)) (new_g, new_h)
+                        else (new_g, new_h)
+                end
+      else (g, h)
+  | ForwardEdge e =>
+      if Nat.eq_dec (vgeneration (dst g e)) from
+      then if (vlabel g (dst g e)).(raw_mark)
+           then (labeledgraph_gen_dst g e (vlabel g (dst g e)).(copied_vertex), h)
+           else let new_g := labeledgraph_gen_dst (lgraph_copy_v g (dst g e) to) e
+                               (new_copied_v g to) in
+                let new_h := cut_heap h (Z.of_nat to) (vertex_size g (dst g e)) in
+                match depth with
+                | O => (new_g, new_h)
+                | S n => if Z_lt_ge_dec (vlabel g (dst g e)).(raw_tag) NO_SCAN_TAG
+                        then forward_gh_loop forward_graph_and_heap from to n
+                               (vertex_pos_pairs new_g (new_copied_v g to)) (new_g, new_h)
+                        else (new_g, new_h)
+                end
+      else (g, h)
+  end.
+
 Ltac raw_mark_contra :=
   lazymatch goal with
   | H1: ?A = true, H2: ?A = false |- _ => rewrite H1 in H2; discriminate
@@ -1593,6 +1635,34 @@ Proof.
         eapply H1; eassumption.
     + assert (new_g = new_g0) by (subst; reflexivity). rewrite <- H2 in H10.
         eapply H1; eassumption.
+Qed.
+
+Lemma forward_relation_satisfied: forall from to depth p g h,
+    forward_relation from to depth p g (fst (forward_graph_and_heap from to depth p g h)).
+Proof.
+  intros from to depth. induction depth; intros.
+  - destruct p; simpl; [constructor..| |].
+    + destruct (Nat.eq_dec _ _); simpl; [|econstructor; eassumption].
+      destruct (raw_mark _) eqn:? ; simpl; econstructor; eassumption.
+    + destruct (Nat.eq_dec _ _); simpl; [|econstructor; eassumption].
+      destruct (raw_mark _) eqn:? ; simpl; econstructor; eassumption.
+  - assert (forall l gh, forward_loop from to depth l (fst gh)
+                      (fst (forward_gh_loop forward_graph_and_heap from to depth l gh))). {
+      induction l; intros; simpl. constructor. destruct gh as [gg hh]. simpl fst.
+      econstructor; [apply IHdepth | apply IHl]. } clear IHdepth.
+    destruct p; simpl; [constructor..| |].
+    + destruct (Nat.eq_dec _ _); simpl; [|econstructor; eassumption];
+      destruct (raw_mark _) eqn:? ; simpl; [econstructor; eassumption |];
+      destruct (Z_lt_ge_dec _ _); [|econstructor; eassumption].
+      apply fr_v_in_not_forwarded_Sn; [assumption..|].
+      remember (lgraph_copy_v _ _ _) as gg. remember (cut_heap _ _ _) as hh.
+      apply (H _ (gg, hh)).
+    + destruct (Nat.eq_dec _ _); simpl; [|econstructor; eassumption];
+      destruct (raw_mark _) eqn:? ; simpl; [econstructor; eassumption |];
+        destruct (Z_lt_ge_dec _ _); [|econstructor; eassumption].
+      remember (labeledgraph_gen_dst _ _ _) as gg. remember (cut_heap _ _ _) as hh.
+      apply fr_e_to_not_forwarded_Sn; [assumption..|]. rewrite <- Heqgg.
+      apply (H _ (gg ,hh)).
 Qed.
 
 Definition forward_p_compatible
