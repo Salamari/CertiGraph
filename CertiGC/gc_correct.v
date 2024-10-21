@@ -1873,7 +1873,7 @@ Proof.
     change (?A :: ?B) with ([A]++B) in H13.
     rewrite roots_graph_compatible_app in H13.
     destruct H13. auto.
-  - pose proof fr_O_no_dangling_dst from to (ForwardPntRoot 0) g1 g2 (r :: roots1)
+  - pose proof fr_O_no_dangling_dst' from to (ForwardPntRoot 0) g1 g2 (r :: roots1)
       ltac:(simpl; list_solve) H3 H5 H7.
     simpl in H13. rewrite Znth_0_cons in H13. auto.
   - eapply fr_copy_compatible; eauto.
@@ -1952,7 +1952,7 @@ Proof.
       eapply (semi_iso_DoubleNoDup _ _ from); eauto.
     + erewrite <- fr_graph_has_gen; eauto.
     + eapply fr_right_roots_graph_compatible; eauto.
-    + eapply fr_O_no_dangling_dst; eauto.
+    + eapply fr_O_no_dangling_dst'; eauto.
     + intros. erewrite <- fr_raw_fields; eauto. apply H8; now right.
     + destruct H19. red in H19. rewrite H19. eapply fr_graph_has_v; eauto.
     + erewrite <- fr_raw_mark; eauto.
@@ -2834,7 +2834,7 @@ Proof.
   assert (H0' := fr_O_sound _ _ _ _ _ H0 H1 H6).
   assert (H1' := proj1 (fr_graph_has_gen _ _ _ _ _ _ H1 H6 to) H1).
   assert (H5' := fr_copy_compatible _ _ _ _ _ _ H H1 H6 H5).
-  assert (H3' := fr_O_no_dangling_dst from to (ForwardPntRoot 0) g1 g2 (r :: roots1)
+  assert (H3' := fr_O_no_dangling_dst' from to (ForwardPntRoot 0) g1 g2 (r :: roots1)
                    ltac:(simpl; list_solve) H1 H2 H5 H6 H3).
   assert (H2' := fr_roots_graph_compatible 0 from to (ForwardPntRoot (Zlength done))
                    g1 g2 (done ++ r :: roots1) H1 ltac:(simpl; list_solve) H5).
@@ -2901,7 +2901,7 @@ Proof.
   - erewrite <- fr_raw_tag; eauto. subst to; auto.
   - eapply fr_gen_unmarked; eauto.
   - eapply fr_right_roots_graph_compatible; eauto.
-  - eapply fr_O_no_dangling_dst; eauto.
+  - eapply fr_O_no_dangling_dst'; eauto.
   - eapply fr_O_copied_vertex_prop; eauto.
   - eapply fr_copy_compatible; eauto.
   - erewrite <- fr_raw_fields; eauto. intros. apply H11. now right.
@@ -2951,7 +2951,7 @@ Proof.
   apply (IHl g3); auto.
   - rewrite <- fr_graph_has_gen; eauto.
   - eapply fr_O_sound; eauto.
-  - eapply fr_O_no_dangling_dst; eauto. red. simpl. constructor.
+  - eapply fr_O_no_dangling_dst'; eauto. red. simpl. constructor.
   - eapply fr_graph_has_v; eauto.
   - erewrite <- fr_raw_mark; eauto.
   - erewrite <- fr_raw_tag; eauto.
@@ -2983,7 +2983,7 @@ Proof.
   - rewrite <- fr_graph_has_gen; eauto.
   - eapply fr_copy_compatible; eauto.
   - eapply fr_O_sound; eauto.
-  - eapply fr_O_no_dangling_dst; eauto.
+  - eapply fr_O_no_dangling_dst'; eauto.
   - eapply fr_gen_unmarked; eauto.
   - eapply fr_O_copied_vertex_prop; eauto.
   - eapply fr_roots_graph_compatible in H16; eauto.
@@ -3037,7 +3037,7 @@ Proof.
   assert (H0' := fr_O_sound _ _ _ _ _ H0 H1 H5).
   assert (H1' := proj1 (fr_graph_has_gen _ _ _ _ _ _ H1 H5 to) H1).
   assert (H5' := fr_copy_compatible _ _ _ _ _ _ H H1 H5 H3).
-  assert (H2' := fr_O_no_dangling_dst from to (ForwardPntRoot 0) g1 g2
+  assert (H2' := fr_O_no_dangling_dst' from to (ForwardPntRoot 0) g1 g2
                    (r :: roots1) ltac:(simpl; list_solve) H1 H4 H3 H5 H2).
   assert (H4' := fr_roots_graph_compatible 0 from to (ForwardPntRoot 0) g1 g2
                    (r :: roots1) H1 ltac:(simpl; list_solve) H3 H5 H H4).
@@ -3094,7 +3094,7 @@ Proof.
  assert (H0' := fr_O_sound _ _ _ _ _ H0 H1 H7).
  assert (H1' := proj1 (fr_graph_has_gen _ _ _ _ _ _ H1 H7 to) H1).
  assert (H3' := fr_copy_compatible _ _ _ _ _ _ H H1 H7 H3).
- assert (H2' := fr_O_no_dangling_dst from to (ForwardPntRoot 0) g1 g2
+ assert (H2' := fr_O_no_dangling_dst' from to (ForwardPntRoot 0) g1 g2
                   (r :: roots1) ltac:(simpl; list_solve) H1 H4 H3 H7 H2).
  assert (H4' := fr_roots_graph_compatible 0 from to (ForwardPntRoot 0) g1 g2
                   (r :: roots1) H1 ltac:(simpl; list_solve) H3 H7 H H4).

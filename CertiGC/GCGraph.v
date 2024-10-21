@@ -1637,7 +1637,7 @@ Proof.
         eapply H1; eassumption.
 Qed.
 
-Lemma forward_relation_satisfied: forall from to depth p g h,
+Lemma fr_forward_graph_and_heap: forall from to depth p g h,
     forward_relation from to depth p g (fst (forward_graph_and_heap from to depth p g h)).
 Proof.
   intros from to depth. induction depth; intros.
@@ -1974,15 +1974,15 @@ Qed.
 Definition rest_gen_size (h: heap) (gen: nat): Z :=
   total_space (nth_space h gen) - used_space (nth_space h gen).
 
-Definition enough_space_to_copy g t_info from to: Prop :=
-  unmarked_gen_size g from <= rest_gen_size t_info to.
+Definition enough_space_to_copy g h from to: Prop :=
+  unmarked_gen_size g from <= rest_gen_size h to.
 
 Definition no_dangling_dst (g: LGraph): Prop :=
   forall v, graph_has_v g v ->
             forall e, In e (get_edges g v) -> graph_has_v g (dst g e).
 
-Definition forward_condition g t_info from to: Prop :=
-  enough_space_to_copy g t_info from to /\
+Definition forward_condition g h from to: Prop :=
+  enough_space_to_copy g h from to /\
   graph_has_gen g from /\ graph_has_gen g to /\
   copy_compatible g /\ no_dangling_dst g.
 
@@ -2637,65 +2637,61 @@ Proof.
     simpl. unfold equiv in H2. rewrite H2. reflexivity.
 Qed.
 
-Lemma cti_rest_gen_size:
-  forall h to s,
-    0 <= Z.of_nat to < Zlength (spaces h) ->
-    has_space (Znth (Z.of_nat to) (spaces h)) s ->
-    rest_gen_size h to = rest_gen_size (cut_heap h (Z.of_nat to) s) to + s.
+Lemma estc_has_space: forall to g h v,
+    graph_has_v g v -> raw_mark (vlabel g v) = false ->
+    enough_space_to_copy g h (vgeneration v) to ->
+    has_space (Znth (Z.of_nat to) (spaces h)) (vertex_size g v).
 Proof.
-  intros. unfold rest_gen_size, cut_heap.
-  destruct (spaces_index_dec _). 2: contradiction.
-  rewrite !nth_space_Znth. simpl.
-  rewrite upd_Znth_same by assumption. unfold_cut_space. simpl. lia.
+    hnf. split. 1: pose proof (svs_gt_one g v); lia.
+    transitivity (unmarked_gen_size g (vgeneration v)).
+    - apply single_unmarked_le; assumption.
+    - red in H1. unfold rest_gen_size in H1. rewrite nth_space_Znth in H1. assumption.
 Qed.
 
-Lemma lmc_estc:
+Lemma lmc_enough_space_to_copy:
   forall (g : LGraph) (h : heap) (v v': VType) (to : nat),
-    0 <= Z.of_nat to < Zlength (spaces h) ->
     enough_space_to_copy g h (vgeneration v) to ->
     graph_has_v g v -> raw_mark (vlabel g v) = false ->
-    has_space (Znth (Z.of_nat to) (spaces h)) (vertex_size g v) ->
     enough_space_to_copy (lgraph_mark_copied g v v')
       (cut_heap h (Z.of_nat to) (vertex_size g v)) (vgeneration v) to.
 Proof.
-  unfold enough_space_to_copy. intros.
-  rewrite (lmc_unmarked_gen_size g v v') in H0 by assumption.
-  erewrite cti_rest_gen_size in H0; [|eassumption..]. lia.
+  intros. pose proof (estc_has_space _ _ _ _ H0 H1 H). unfold enough_space_to_copy in *.
+  rewrite (lmc_unmarked_gen_size g v v') in H by assumption. pose proof (svs_gt_one g v).
+  unfold cut_heap. destruct (spaces_index_dec _ _); [|lia].
+  unfold rest_gen_size in *. rewrite !nth_space_Znth in *. simpl.
+  rewrite upd_Znth_same by assumption. unfold_cut_space. simpl. lia.
 Qed.
 
-Lemma forward_estc: forall g h v to,
-    0 <= Z.of_nat to < Zlength (spaces h) ->
-    has_space (Znth (Z.of_nat to) (spaces h)) (vertex_size g v) ->
+Lemma lcv_enough_space_to_copy: forall g h v to,
     vgeneration v <> to -> graph_has_gen g to ->
     graph_has_v g v -> raw_mark (vlabel g v) = false ->
     enough_space_to_copy g h (vgeneration v) to ->
     enough_space_to_copy (lgraph_copy_v g v to)
          (cut_heap h (Z.of_nat to) (vertex_size g v)) (vgeneration v) to.
 Proof.
-  intros. unfold lgraph_copy_v.
+  intros g h v to H1 H2 H3 H4 H5. unfold lgraph_copy_v.
+  pose proof (estc_has_space _ _ _ _ H3 H4 H5) as H0.
   apply (lacv_estc _ _ _ _ v) in H5; [| assumption..].
-  assert (vertex_size g v = vertex_size (lgraph_add_copied_v g v to) v). {
+  assert (H6: vertex_size g v = vertex_size (lgraph_add_copied_v g v to) v). {
     unfold vertex_size. rewrite lacv_vlabel_old. 1: reflexivity.
-    intro. destruct v as [gen index]. simpl in H0.
+    intro H6. destruct v as [gen index]. simpl in H0.
     unfold new_copied_v in H6. inversion H6. apply H1. assumption. }
   remember (lgraph_add_copied_v g v to) as g'. rewrite H6 in H0.
   replace (cut_heap h (Z.of_nat to) (vertex_size g v)) with
     (cut_heap h (Z.of_nat to) (vertex_size g' v)) by (now rewrite H6).
-  apply lmc_estc; try assumption.
+  apply lmc_enough_space_to_copy; try assumption.
   - subst g'. apply lacv_graph_has_v_old; assumption.
   - subst g'. rewrite lacv_vlabel_old; [| apply graph_has_v_not_eq]; assumption.
 Qed.
 
 Lemma lcv_forward_condition: forall g h v to,
-    0 <= Z.of_nat to < Zlength (spaces h) ->
-    has_space (Znth (Z.of_nat to) (spaces h)) (vertex_size g v) ->
     vgeneration v <> to -> graph_has_v g v -> raw_mark (vlabel g v) = false ->
     forward_condition g h (vgeneration v) to ->
     forward_condition (lgraph_copy_v g v to)
         (cut_heap h (Z.of_nat to) (vertex_size g v)) (vgeneration v) to.
 Proof.
-  intros. destruct H4 as [? [? [? [? ?]]]]. split; [|split; [|split; [|split]]].
-  - apply forward_estc;  assumption.
+  intros. destruct H2 as [? [? [? [? ?]]]]. split; [|split; [|split; [|split]]].
+  - apply lcv_enough_space_to_copy;  assumption.
   - apply lcv_graph_has_gen; assumption.
   - apply lcv_graph_has_gen; assumption.
   - apply lcv_copy_compatible; assumption.
@@ -2826,9 +2822,7 @@ Proof.
 Qed.
 
 Lemma lcv_rootpairs_compatible: forall
-    g h rootpairs roots z v to i s
-    (Hi : 0 <= i < Zlength (spaces h))
-    (Hh : has_space (Znth i (spaces h)) s)
+    g rootpairs roots z v to
     (Hm : 0 <= z < Zlength roots),
     graph_has_gen g to -> roots_graph_compatible roots g ->
     rootpairs_compatible g rootpairs roots ->
@@ -2903,9 +2897,8 @@ Proof.
   rewrite nat_inc_list_In_iff in H2. subst. split; simpl; assumption.
 Qed.
 
-Lemma lcv_graph_thread_info_compatible: forall
+Lemma lcv_graph_heap_compatible: forall
     g h v to
-    (Hi : 0 <= Z.of_nat to < Zlength (spaces h))
     (Hh : has_space (Znth (Z.of_nat to) (spaces h)) (vertex_size g v)),
     graph_has_gen g to ->
     graph_heap_compatible g h ->
@@ -2913,6 +2906,8 @@ Lemma lcv_graph_thread_info_compatible: forall
       (cut_heap h (Z.of_nat to) (vertex_size g v)).
 Proof.
   unfold graph_heap_compatible. intros. destruct H0 as [? [? ?]].
+  assert (Hi : 0 <= Z.of_nat to < Zlength (spaces h)). {
+    unfold graph_has_gen in H. rewrite Zlength_correct. list_solve. }
   assert (map space_start (spaces h) =
           map space_start (upd_Znth (Z.of_nat to) (spaces h)
                              (cut_space (Znth (Z.of_nat to) (spaces h))
@@ -2959,7 +2954,6 @@ Qed.
 
 Lemma lcv_super_compatible_unchanged: forall
     g h rootpairs roots outlier to v
-    (Hi : 0 <= Z.of_nat to < Zlength (spaces h))
     (Hh : has_space (Znth (Z.of_nat to) (spaces h)) (vertex_size g v)),
     graph_has_gen g to -> graph_has_v g v ->
     super_compatible g h rootpairs roots outlier ->
@@ -2968,7 +2962,7 @@ Lemma lcv_super_compatible_unchanged: forall
       rootpairs roots outlier.
 Proof.
   intros. destruct H1 as [? [? [? ?]]]. split; [|split; [|split]].
-  - apply lcv_graph_thread_info_compatible; assumption.
+  - apply lcv_graph_heap_compatible; assumption.
   - destruct H3. apply lcv_rootpairs_compatible_unchanged; assumption.
   - apply lcv_roots_compatible_unchanged; assumption.
   - apply lcv_outlier_compatible; assumption.
@@ -2976,7 +2970,6 @@ Qed.
 
 Lemma lcv_super_compatible: forall
     g h rootpairs roots outlier to v z
-    (Hi : 0 <= Z.of_nat to < Zlength (spaces h))
     (Hh : has_space (Znth (Z.of_nat to) (spaces h)) (vertex_size g v))
     (Hm : 0 <= z < Zlength roots),
     graph_has_gen g to -> graph_has_v g v ->
@@ -2989,7 +2982,7 @@ Lemma lcv_super_compatible: forall
       (upd_Znth z roots (RootVertex (new_copied_v g to))) outlier.
 Proof.
   intros. destruct H1 as [? [? [? ?]]]. split; [|split; [|split]].
-  - apply lcv_graph_thread_info_compatible; assumption.
+  - apply lcv_graph_heap_compatible; assumption.
   - destruct H3. eapply lcv_rootpairs_compatible; eassumption.
   - apply lcv_roots_compatible; assumption.
   - apply lcv_outlier_compatible; assumption.
@@ -3223,8 +3216,7 @@ Qed.
 Lemma lgd_enough_space_to_copy: forall g e v' t_info gen sp,
     enough_space_to_copy g t_info gen sp ->
     enough_space_to_copy (labeledgraph_gen_dst g e v') t_info gen sp.
-Proof.
-  intros. unfold enough_space_to_copy in *. intuition auto. Qed.
+Proof. intros. unfold enough_space_to_copy in *. intuition auto. Qed.
 
 Lemma lgd_copy_compatible: forall g v' e,
     copy_compatible g ->
@@ -3260,12 +3252,11 @@ Lemma lgd_roots_compatible: forall g outlier roots e v,
     roots_compatible (labeledgraph_gen_dst g e v) outlier roots.
 Proof. intros. destruct H. split; [|apply lgd_rgc]; assumption. Qed.
 
-Lemma lgd_graph_thread_info_compatible:
+Lemma lgd_graph_heap_compatible:
   forall (g : LGraph) (h : heap) e (v' : VType),
   graph_heap_compatible g h ->
   graph_heap_compatible (labeledgraph_gen_dst g e v') h.
-Proof.
-  intros; destruct H; split; assumption. Qed.
+Proof. intros; destruct H; split; assumption. Qed.
 
 Lemma lgd_fun_thread_arg_compatible:
   forall (g : LGraph) rootpairs e (v' : VType) roots,
@@ -3292,7 +3283,7 @@ Lemma lgd_super_compatible: forall g (h: heap) (rootpairs: list rootpair) roots 
     super_compatible (labeledgraph_gen_dst g e v') h rootpairs roots outlier.
 Proof.
   intros. destruct H as [? [? [? ?]]]. split; [|split; [|split]].
-  - apply lgd_graph_thread_info_compatible; assumption.
+  - apply lgd_graph_heap_compatible; assumption.
   - destruct H1. apply lgd_fun_thread_arg_compatible; assumption.
   - apply lgd_roots_compatible; assumption.
   - apply lgd_outlier_compatible; assumption.
@@ -5053,38 +5044,135 @@ Proof.
   - unfold new_copied_v. simpl. auto.
 Qed.
 
-Lemma fr_O_no_dangling_dst: forall from to p g g' roots,
+Definition forward_t_compatible (p: forward_t) (g: LGraph) :=
+  match p with
+  | ForwardVertex v => graph_has_v g v
+  | ForwardEdge e => graph_has_e g e
+  | _ => True
+  end.
+
+Lemma fr_O_no_dangling_dst: forall from to p g g',
+    forward_t_compatible p g ->
+    graph_has_gen g to ->
+    copy_compatible g ->
+    forward_relation from to O p g g' ->
+    no_dangling_dst g -> no_dangling_dst g'.
+Proof.
+  intros. destruct p; inversion H2; subst; clear H2; try assumption.
+  - apply lcv_no_dangling_dst; assumption.
+  - subst new_g. apply lgd_no_dangling_dst; [|assumption]. destruct H.
+    specialize (H3 _ H _ H2). destruct (H1 (dst g e) H3 H7). assumption.
+  - subst new_g. apply lgd_no_dangling_dst.
+    + apply lcv_graph_has_v_new. assumption.
+    + apply lcv_no_dangling_dst; [assumption..|]. destruct H. apply (H3 _ H _ H2).
+Qed.
+
+Lemma vertex_pos_forward_t_compatible: forall g v i,
+    graph_has_v g v -> (0 <= i < Zlength (raw_fields (vlabel g v)))%Z ->
+    forward_t_compatible (field2forward (Znth i (make_fields g v))) g.
+Proof.
+  intros. destruct (Znth i (make_fields g v)) eqn: ?H; simpl; [exact I..|]. pose proof H1.
+  apply make_fields_Znth_edge in H1; [|assumption]. subst. hnf. simpl. split; [assumption|].
+  unfold get_edges. rewrite <- (filter_proj_In_iff field_proj_edge_spec), <- H2.
+  apply Znth_In; rewrite make_fields_eq_length. assumption.
+Qed.
+
+Lemma forward_loop_no_dangling_dst: forall (from to depth: nat) (g' : LGraph) (vv : VType)
+                                      (l : list forward_p_type) (gg : LGraph),
+    from <> to ->
+    (forall (p : forward_t) (g g' : LGraph),
+        forward_t_compatible p g ->
+        graph_has_gen g to ->
+        copy_compatible g ->
+        forward_relation from to depth p g g' -> no_dangling_dst g -> no_dangling_dst g') ->
+      vgeneration vv <> from ->
+      raw_mark (vlabel gg vv) = false ->
+      graph_has_gen gg to ->
+      graph_has_v gg vv ->
+      copy_compatible gg ->
+      no_dangling_dst gg ->
+      Forall
+        (fun p : forward_p_type =>
+           exists i : Z, p = ForwardPntVertex vv i /\ (0 <= i < Zlength (make_fields gg vv))%Z) l ->
+      forward_loop from to depth l gg g' -> no_dangling_dst g'.
+Proof.
+  intros from to depth g' vv l gg Hft IHdepth. revert l gg g'.
+  induction l; intros; inversion H6; subst; clear H6; auto. apply (IHl g2); auto.
+  - erewrite <- fr_raw_mark. apply H0. apply H1. apply H10. apply H2. apply H.
+  - rewrite <- fr_graph_has_gen; [apply H1..| apply H10].
+  - eapply fr_graph_has_v. apply H1. apply H10. apply H2.
+  - eapply fr_copy_compatible. apply Hft. apply H1. apply H10. apply H3.
+  - specialize (IHdepth (forward_p2forward_t a [] gg) gg g2). apply IHdepth; auto.
+    inversion H5. subst. destruct H8 as [i [? ?]]. subst. simpl. rewrite H0. simpl.
+    apply vertex_pos_forward_t_compatible; auto. now rewrite <- make_fields_eq_length.
+  - cut (Zlength (make_fields g2 vv) = Zlength (make_fields gg vv)).
+    + intros Hz. rewrite Hz. inversion H5; assumption.
+    + rewrite !make_fields_eq_length. symmetry. f_equal.
+      eapply fr_raw_fields. apply H1. apply H10. apply H2.
+Qed.
+
+Lemma vertex_pos_pairs_in_range: forall (v : VType) (g : LGraph),
+    Forall
+      (fun p : forward_p_type =>
+         exists i : Z, p = ForwardPntVertex v i /\ (0 <= i < Zlength (make_fields g v))%Z)
+      (vertex_pos_pairs g v).
+Proof.
+  intros. rewrite Forall_forall. intros. apply In_Znth in H. destruct H as [idx [? ?]].
+  rewrite vpp_Zlength in H. rewrite make_fields_eq_length.
+  rewrite vpp_Znth in H0; [|assumption]. exists idx. split; easy.
+Qed.
+
+Lemma fr_no_dangling_dst: forall from to depth p g g',
+    from <> to ->
+    forward_t_compatible p g ->
+    graph_has_gen g to ->
+    copy_compatible g ->
+    forward_relation from to depth p g g' ->
+    no_dangling_dst g -> no_dangling_dst g'.
+Proof.
+  intros from to depth p g g' Hft. revert depth p g g'.
+  induction depth; [ apply fr_O_no_dangling_dst |].
+  destruct p; intros; inversion H2; subst; clear H2; try assumption.
+  - eapply (forward_loop_no_dangling_dst (vgeneration v) to depth g' (new_copied_v g to)
+              (vertex_pos_pairs new_g (new_copied_v g to)) new_g);
+      auto; subst new_g.
+    + rewrite lcv_vlabel_new; assumption.
+    + apply lcv_graph_has_gen; assumption.
+    + apply lcv_graph_has_v_new. assumption.
+    + apply lcv_copy_compatible; assumption.
+    + apply lcv_no_dangling_dst; assumption.
+    + apply vertex_pos_pairs_in_range.
+  - apply lcv_no_dangling_dst; assumption.
+  - subst new_g. apply lgd_no_dangling_dst; [|assumption]. destruct H.
+    specialize (H3 _ H _ H2). destruct (H1 (dst g e) H3 H7). assumption.
+  - apply (forward_loop_no_dangling_dst (vgeneration (dst g e)) to depth g'
+             (new_copied_v g to) (vertex_pos_pairs new_g (new_copied_v g to)) new_g);
+      auto; subst new_g.
+    + rewrite <- lgd_raw_mark_eq. rewrite lcv_vlabel_new; assumption.
+    + rewrite lgd_graph_has_gen. apply lcv_graph_has_gen; assumption.
+    + rewrite <- lgd_graph_has_v. apply lcv_graph_has_v_new. assumption.
+    + apply lgd_copy_compatible. apply lcv_copy_compatible; assumption.
+    + apply lgd_no_dangling_dst; [apply lcv_graph_has_v_new; assumption|].
+      apply lcv_no_dangling_dst; [assumption..|]. destruct H. apply (H3 _ H _ H2).
+    + apply vertex_pos_pairs_in_range.
+  - subst new_g. apply lgd_no_dangling_dst.
+    * apply lcv_graph_has_v_new. assumption.
+    * apply lcv_no_dangling_dst; [assumption..|]. destruct H. apply (H3 _ H _ H2).
+Qed.
+
+Lemma fr_O_no_dangling_dst': forall from to p g g' roots,
     forward_p_compatible p roots g from -> graph_has_gen g to ->
     roots_graph_compatible roots g -> copy_compatible g ->
     forward_relation from to O (forward_p2forward_t p roots g) g g' ->
     no_dangling_dst g -> no_dangling_dst g'.
 Proof.
-  intros. inversion H3; subst; try assumption.
-  - destruct p; simpl in H5.
-    + destruct (Znth root_number roots) eqn:? ; simpl in H5; inversion H5.
-      subst v0. clear H5. apply lcv_no_dangling_dst; auto. red in H1.
-      rewrite Forall_forall in H1. apply H1.
-      rewrite <- (filter_proj_In_iff root_proj_vertex_spec).
-      rewrite <- Heqr. apply Znth_In. assumption.
-    + simpl in H. destruct H as [? [? [? ?]]]. rewrite H8 in H5. simpl in H5.
-      destruct (Znth field_number (make_fields g vertex)); simpl in H5; inversion H5.
-  - subst new_g. apply lgd_no_dangling_dst_copied_vert; auto. destruct p; simpl in H5.
-    + destruct (Znth root_number roots); simpl in H5; inversion H5.
-    + simpl in H. destruct H as [? [? [? ?]]]. rewrite H7 in H5. simpl in H5.
-      destruct (Znth field_number (make_fields g vertex)) eqn:? ;
-        simpl in H5; inversion H5. subst e0. clear H5.
-      specialize (H4 _ H). apply H4. unfold get_edges.
-      rewrite <- (filter_proj_In_iff field_proj_edge_spec), <- Heqf. apply Znth_In.
-      rewrite make_fields_eq_length. assumption.
-  - subst new_g. apply lgd_no_dangling_dst. 1: apply lcv_graph_has_v_new; auto.
-    apply lcv_no_dangling_dst; auto. destruct p; simpl in H5.
-    + destruct (Znth root_number roots); simpl in H5; inversion H5.
-    + simpl in H. destruct H as [? [? [? ?]]]. rewrite H8 in H5. simpl in H5.
-      destruct (Znth field_number (make_fields g vertex)) eqn:? ;
-        simpl in H5; inversion H5. subst e0. clear H5.
-      specialize (H4 _ H). apply H4. unfold get_edges.
-      rewrite <- (filter_proj_In_iff field_proj_edge_spec), <- Heqf. apply Znth_In.
-      rewrite make_fields_eq_length. assumption.
+  intros. eapply fr_O_no_dangling_dst; eauto. destruct p; simpl.
+  - destruct (Znth root_number roots) eqn:? ; simpl; auto. simpl in H. hnf in H1.
+    rewrite Forall_forall in H1. apply H1.
+    rewrite <- (filter_proj_In_iff root_proj_vertex_spec), <- Heqr.
+    apply Znth_In. assumption.
+  - destruct H as [? [? [? [? ?]]]]. rewrite H6. simpl.
+    apply vertex_pos_forward_t_compatible; assumption.
 Qed.
 
 Lemma svfl_dst_changed: forall from to v l g1 g2,
@@ -5123,7 +5211,7 @@ Proof.
   - eapply (IHl g3); eauto.
     + erewrite <- fr_raw_tag; eauto.
     + eapply (fr_copy_compatible _ _ _ _ g1); eauto.
-    + eapply (fr_O_no_dangling_dst _ _ _ g1); eauto.
+    + eapply (fr_O_no_dangling_dst' _ _ _ g1); eauto.
       * simpl. intuition auto with *. rewrite Zlength_correct. apply inj_lt. apply H5.
         left; reflexivity.
       * simpl. constructor.
@@ -5191,7 +5279,7 @@ Proof.
     + eapply (fr_copy_compatible O from to); eauto.
     + erewrite <- fr_graph_has_gen; eauto.
     + intros. erewrite <- fr_raw_fields; eauto. apply H7. right; assumption.
-  - eapply fr_O_no_dangling_dst; eauto.
+  - eapply fr_O_no_dangling_dst'; eauto.
     + simpl. intuition auto with *.
       rewrite Zlength_correct. apply inj_lt.
       apply H7. left; reflexivity.
@@ -5280,7 +5368,7 @@ Proof.
       apply H2. right; assumption.
     + eapply fr_roots_graph_compatible; eauto.
   - fold (forward_p2forward_t (inl (Z.of_nat a)) roots g) in H9.
-    eapply fr_O_no_dangling_dst; eauto.
+    eapply fr_O_no_dangling_dst'; eauto.
 Qed.
 *)
 
@@ -5300,7 +5388,7 @@ Proof.
     spec H6; auto. spec H6; [list_solve| ].
     repeat (spec H6; [auto |]).
     apply Forall_filter_proj_cons in H6; auto.
-  - apply (fr_O_no_dangling_dst from to (ForwardPntRoot 0%Z) g1 g2 (r :: roots1)); auto;
+  - apply (fr_O_no_dangling_dst' from to (ForwardPntRoot 0%Z) g1 g2 (r :: roots1)); auto;
       simpl; try list_solve.
 Qed.
 
@@ -5493,8 +5581,7 @@ Lemma gti_compatible_add: forall g h gi sp i (Hs: 0 <= i < MAX_SPACES),
     graph_heap_compatible g h->
     ~ graph_has_gen g (Z.to_nat i) -> graph_has_gen g (Z.to_nat (i - 1)) ->
     (forall (gr: LGraph), generation_space_compatible gr (Z.to_nat i, gi, sp)) ->
-    graph_heap_compatible (lgraph_add_new_gen g gi)
-                                 (add_new_space h sp i Hs).
+    graph_heap_compatible (lgraph_add_new_gen g gi) (add_new_space h sp i Hs).
 Proof.
   intros. unfold graph_heap_compatible in *. destruct H as [? [? ?]].
   assert (length (g_gen (glabel g)) = Z.to_nat i). {
@@ -6316,11 +6403,223 @@ Proof.
 Qed.
 
 Lemma sc_Zlength:  forall [g h rps rs outliers],
-  super_compatible g h rps rs outliers ->
-    Zlength rs = Zlength rps.
-  Proof.
-   intros.
-   destruct H as [_ [? _]].
-   apply (f_equal (@Zlength _)) in H.
+    super_compatible g h rps rs outliers -> Zlength rs = Zlength rps.
+Proof.
+  intros.
+  destruct H as [_ [? _]].
+  apply (f_equal (@Zlength _)) in H.
   list_solve.
+Qed.
+
+Lemma forward_graph_and_heap_O_estc: forall from to p g h,
+    from <> to ->
+    forward_t_compatible p g ->
+    no_dangling_dst g ->
+    graph_has_gen g to ->
+    enough_space_to_copy g h from to ->
+    let (g', h') := forward_graph_and_heap from to O p g h in
+    enough_space_to_copy g' h' from to.
+Proof.
+  simpl. intros. destruct p; [assumption..| |]; destruct (Nat.eq_dec _ _);
+    [|assumption | |assumption]; destruct (raw_mark _) eqn: ? ; [assumption| | |]; subst.
+  - apply lcv_enough_space_to_copy; assumption.
+  - apply lgd_enough_space_to_copy. assumption.
+  - apply lgd_enough_space_to_copy.
+    apply lcv_enough_space_to_copy; auto. destruct H0. apply (H1 _ H0 _ H4).
+Qed.
+
+Lemma forward_gh_loop_estc: forall (from to depth : nat) (vv : VType)
+                              (l : list forward_p_type) (gg : LGraph) (hh : heap),
+    from <> to ->
+    (forall (p : forward_t) (g : LGraph) (h : heap),
+        forward_t_compatible p g ->
+        no_dangling_dst g ->
+        graph_has_gen g to ->
+        copy_compatible g ->
+        enough_space_to_copy g h from to ->
+        let (g', h') := forward_graph_and_heap from to depth p g h in
+        enough_space_to_copy g' h' from to) ->
+    vgeneration vv <> from ->
+    no_dangling_dst gg ->
+    copy_compatible gg ->
+    raw_mark (vlabel gg vv) = false ->
+    graph_has_gen gg to ->
+    graph_has_v gg vv ->
+    Forall
+      (fun p : forward_p_type =>
+         exists i : Z, p = ForwardPntVertex vv i /\ 0 <= i < Zlength (make_fields gg vv)) l ->
+    enough_space_to_copy gg hh from to ->
+    let (g', h') := forward_gh_loop forward_graph_and_heap from to depth l (gg, hh) in
+    enough_space_to_copy g' h' from to.
+Proof.
+  intros from to depth vv l gg hh Hft IHdepth Hv. revert l gg hh.
+  induction l; intros; simpl; [assumption | ].
+  remember (forward_graph_and_heap _ _ _ _ _ _). rewrite (surjective_pairing p).
+  assert (Hc: forward_t_compatible (forward_p2forward_t a [] gg) gg). {
+    inversion H4. subst. destruct H8 as [i [? ?]]. subst. simpl. rewrite H1. simpl.
+    apply vertex_pos_forward_t_compatible; auto. now rewrite <- make_fields_eq_length. }
+  assert (forward_relation from to depth (forward_p2forward_t a [] gg) gg (fst p)). {
+    subst p. apply fr_forward_graph_and_heap. } apply IHl.
+  - eapply fr_no_dangling_dst;
+      [apply Hft | apply Hc | apply H2 | apply H0 | apply H6 | apply H].
+  - eapply fr_copy_compatible; [apply Hft | apply H2 | apply H6 | apply H0].
+  - erewrite <- fr_raw_mark; [apply H1 | apply H2 | apply H6 | apply H3 | apply Hv].
+  - rewrite <- fr_graph_has_gen; [apply H2..| apply H6].
+  - eapply fr_graph_has_v; [apply H2 | apply H6 | apply H3].
+  - cut (Zlength (make_fields (fst p) vv) = Zlength (make_fields gg vv)).
+    + intros Hz. rewrite Hz. inversion H4; assumption.
+    + rewrite !make_fields_eq_length. symmetry. f_equal.
+      eapply fr_raw_fields; [apply H2 | apply H6 | apply H3].
+  - specialize (IHdepth (forward_p2forward_t a [] gg) gg hh).
+    rewrite <- Heqp in IHdepth. destruct p as [g' h']. simpl. apply IHdepth; auto.
+Qed.
+
+Lemma forward_graph_and_heap_estc: forall from to depth p g h,
+    from <> to ->
+    forward_t_compatible p g ->
+    no_dangling_dst g ->
+    graph_has_gen g to ->
+    copy_compatible g ->
+    enough_space_to_copy g h from to ->
+    let (g', h') := forward_graph_and_heap from to depth p g h in
+    enough_space_to_copy g' h' from to.
+Proof.
+  intros from to depth p g h Hft. revert depth p g h. induction depth; intros.
+  1: eapply forward_graph_and_heap_O_estc; eassumption. simpl; intros.
+  destruct p; [assumption..| |]; destruct (Nat.eq_dec _ _); [|assumption | |assumption];
+    destruct (raw_mark _) eqn: ? ; [assumption| | now apply lgd_enough_space_to_copy |];
+    destruct (Z_lt_ge_dec _ _); subst.
+  - apply (forward_gh_loop_estc (vgeneration v) to depth (new_copied_v g to)); auto.
+    + apply lcv_no_dangling_dst; assumption.
+    + apply lcv_copy_compatible; assumption.
+    + rewrite lcv_vlabel_new; assumption.
+    + rewrite <- lcv_graph_has_gen; assumption.
+    + apply lcv_graph_has_v_new. assumption.
+    + apply vertex_pos_pairs_in_range.
+    + apply lcv_enough_space_to_copy; assumption.
+  - apply lcv_enough_space_to_copy; assumption.
+  - assert (graph_has_v g (dst g e)) by (destruct H; apply (H0 _ H _ H4)).
+    apply (forward_gh_loop_estc (vgeneration (dst g e)) to depth (new_copied_v g to)); auto.
+    + apply lgd_no_dangling_dst.
+      * apply lcv_graph_has_v_new. assumption.
+      * apply lcv_no_dangling_dst; assumption.
+    + apply lgd_copy_compatible. apply lcv_copy_compatible; assumption.
+    + rewrite <- lgd_raw_mark_eq. rewrite lcv_vlabel_new; assumption.
+    + rewrite lgd_graph_has_gen. apply lcv_graph_has_gen; assumption.
+    + rewrite <- lgd_graph_has_v. apply lcv_graph_has_v_new. assumption.
+    + apply vertex_pos_pairs_in_range.
+    + apply lgd_enough_space_to_copy. apply lcv_enough_space_to_copy; assumption.
+  - apply lgd_enough_space_to_copy. apply lcv_enough_space_to_copy; auto.
+    destruct H. apply (H0 _ H _ H4).
+Qed.
+
+Lemma forward_graph_and_heap_O_ghc: forall from to p g h,
+    forward_t_compatible p g ->
+    no_dangling_dst g ->
+    graph_has_gen g to ->
+    enough_space_to_copy g h from to ->
+    graph_heap_compatible g h ->
+    let (g', h') := forward_graph_and_heap from to O p g h in
+    graph_heap_compatible g' h'.
+Proof.
+  simpl; intros.
+  destruct p; [assumption..| |]; destruct (Nat.eq_dec _ _); [|assumption | |assumption];
+    destruct (raw_mark _) eqn: ? ; [assumption| | |]; subst.
+  - apply lcv_graph_heap_compatible; auto. apply estc_has_space; assumption.
+  - now apply lgd_graph_heap_compatible.
+  - apply lgd_graph_heap_compatible, lcv_graph_heap_compatible; [|assumption..].
+    apply estc_has_space; [|assumption..]. destruct H. apply (H0 _ H _ H4).
+Qed.
+
+Lemma forward_gh_loop_ghc: forall (from to depth: nat) (vv : VType)
+                             (l : list forward_p_type) (gg : LGraph) (hh : heap),
+    from <> to ->
+    (forall (p : forward_t) (g : LGraph) (h : heap),
+        forward_t_compatible p g ->
+        no_dangling_dst g ->
+        graph_has_gen g to ->
+        enough_space_to_copy g h from to ->
+        copy_compatible g ->
+        graph_heap_compatible g h ->
+        let (g', h') := forward_graph_and_heap from to depth p g h in
+        graph_heap_compatible g' h') ->
+    vgeneration vv <> from ->
+    no_dangling_dst gg ->
+    enough_space_to_copy gg hh from to ->
+    raw_mark (vlabel gg vv) = false ->
+    graph_has_gen gg to ->
+    graph_has_v gg vv ->
+    copy_compatible gg ->
+    Forall
+      (fun p : forward_p_type =>
+         exists i : Z, p = ForwardPntVertex vv i /\ 0 <= i < Zlength (make_fields gg vv)) l ->
+    graph_heap_compatible gg hh ->
+    let (g', h') := forward_gh_loop forward_graph_and_heap from to depth l (gg, hh) in
+    graph_heap_compatible g' h'.
+Proof.
+  intros from to depth vv l gg hh Hft IHdepth Hv. revert l gg hh.
+  induction l; intros; simpl; [assumption |].
+  remember (forward_graph_and_heap _ _ _ _ _ _). rewrite (surjective_pairing p).
+  assert (Hcmpt: forward_t_compatible (forward_p2forward_t a [] gg) gg). {
+    inversion H5. subst. destruct H9 as [i [? ?]]. subst. simpl. rewrite H1. simpl.
+    apply vertex_pos_forward_t_compatible; auto. now rewrite <- make_fields_eq_length. }
+  assert (forward_relation from to depth (forward_p2forward_t a [] gg) gg (fst p)). {
+    subst p; apply fr_forward_graph_and_heap. } apply IHl.
+  - eapply fr_no_dangling_dst;
+      [apply Hft | apply Hcmpt | apply H2 | apply H4 | apply H7 | apply H].
+  - pose proof (forward_graph_and_heap_estc _ _ depth _ _ _ Hft Hcmpt H H2 H4 H0).
+    rewrite <- Heqp, (surjective_pairing p) in H8. assumption.
+  - erewrite <- fr_raw_mark; [apply H1 | apply H2 | apply H7 | apply H3 | apply Hv].
+  - rewrite <- fr_graph_has_gen; [apply H2..| apply H7].
+  - eapply fr_graph_has_v; [apply H2 | apply H7 | apply H3].
+  - eapply fr_copy_compatible; [apply Hft | apply H2 | apply H7 | apply H4].
+  - cut (Zlength (make_fields (fst p) vv) = Zlength (make_fields gg vv)).
+    + intros Hz. rewrite Hz. inversion H5; assumption.
+    + rewrite !make_fields_eq_length. symmetry. f_equal.
+      eapply fr_raw_fields; [apply H2 | apply H7 | apply H3].
+  - specialize (IHdepth (forward_p2forward_t a [] gg) gg hh).
+    rewrite <- Heqp in IHdepth. destruct p as [g' h']. simpl. apply IHdepth; assumption.
+Qed.
+
+Lemma forward_graph_and_heap_ghc: forall from to depth p g h,
+    from <> to ->
+    forward_t_compatible p g ->
+    no_dangling_dst g ->
+    graph_has_gen g to ->
+    enough_space_to_copy g h from to ->
+    copy_compatible g ->
+    graph_heap_compatible g h ->
+    let (g', h') := forward_graph_and_heap from to depth p g h in
+    graph_heap_compatible g' h'.
+Proof.
+  intros from to depth p g h Hft. revert depth p g h.
+  induction depth; [intros; eapply forward_graph_and_heap_O_ghc; eassumption|].
+  simpl; intros; destruct p; [assumption..| |]; destruct (Nat.eq_dec _ _);
+    [|assumption | |assumption]; destruct (raw_mark _) eqn: ?H ;
+    [assumption| | now apply lgd_graph_heap_compatible |]; destruct (Z_lt_ge_dec _ _); subst.
+  - apply (forward_gh_loop_ghc (vgeneration v) to depth (new_copied_v g to)); auto.
+    + apply lcv_no_dangling_dst; assumption.
+    + apply lcv_enough_space_to_copy; assumption.
+    + rewrite lcv_vlabel_new; assumption.
+    + rewrite <- lcv_graph_has_gen; assumption.
+    + apply lcv_graph_has_v_new. assumption.
+    + apply lcv_copy_compatible; assumption.
+    + apply vertex_pos_pairs_in_range.
+    + apply lcv_graph_heap_compatible; [|assumption..]. apply estc_has_space; assumption.
+  - apply lcv_graph_heap_compatible; [|assumption..]. apply estc_has_space; assumption.
+  - assert (graph_has_v g (dst g e)) by (destruct H; apply (H0 _ H _ H6)).
+    apply (forward_gh_loop_ghc (vgeneration (dst g e)) to depth (new_copied_v g to)); auto.
+    + apply lgd_no_dangling_dst.
+      * apply lcv_graph_has_v_new; assumption.
+      * apply lcv_no_dangling_dst; assumption.
+    + apply lgd_enough_space_to_copy. apply lcv_enough_space_to_copy; assumption.
+    + rewrite <- lgd_raw_mark_eq. rewrite lcv_vlabel_new; assumption.
+    + rewrite lgd_graph_has_gen. apply lcv_graph_has_gen; assumption.
+    + rewrite <- lgd_graph_has_v. apply lcv_graph_has_v_new. assumption.
+    + apply lgd_copy_compatible. apply lcv_copy_compatible; assumption.
+    + apply vertex_pos_pairs_in_range.
+    + apply lgd_graph_heap_compatible, lcv_graph_heap_compatible; [|assumption..].
+      apply estc_has_space; assumption.
+  - apply lgd_graph_heap_compatible, lcv_graph_heap_compatible; [|assumption..].
+    apply estc_has_space; [|assumption..]. destruct H; apply (H0 _ H _ H6).
 Qed.
