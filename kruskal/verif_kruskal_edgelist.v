@@ -19,7 +19,7 @@ Require Import CertiGraph.graph.undirected_uf_lemmas.
 Local Open Scope Z_scope.
 
 Lemma data_at_singleton_array_eq':
-  forall (sh : Share.t) (t : type) (v : reptype t) (p : val), 
+  forall (sh : Share.t) (t : type) (v : reptype t) (p : val),
   data_at sh (Tarray t 1 noattr) [v] p = data_at sh t v p.
 Proof.
 intros. apply data_at_singleton_array_eq. auto.
@@ -27,7 +27,7 @@ Qed.
 
 (*************************************************************)
 
-Context {size: Z}.
+#[local] Parameter (size: Z).
 
 (*Moved this here because:
 -universe inconsistency, proof is too long and I'm too tired to track it down
@@ -726,7 +726,7 @@ Proof.
     2: auto. 2: apply Vundef_cwedges_Zlength; lia. Intros.
   rewrite <- HZlength_glist.
   (******************************SORT******************************)
-  forward_call ((*wshare_share sh*) sh, 
+  forward_call ((*wshare_share sh*) sh,
                 pointer_val_val orig_eptr,
                 (map wedge_to_cdata glist)).
   Intros sorted.
@@ -740,7 +740,7 @@ Proof.
   assert (HZlength_sorted: Zlength sorted = numE g). {
     rewrite <- (Permutation_Zlength _ _ H0). apply HZlength_glist.
   } rewrite HZlength_glist. rewrite HZlength_sorted.
-  (******************************THE BIG NASTY LOOP******************************) 
+  (******************************THE BIG NASTY LOOP******************************)
   forward_for_simple_bound
     (numE g)
     (EX i : Z,
@@ -905,7 +905,7 @@ Proof.
     Intros u_root. destruct u_root as [subsetsGraph_u u_root].
     simpl fst.
     (*find v*)
-    forward_call (sh, subsetsGraph_u, subsetsPtr, v). 
+    forward_call (sh, subsetsGraph_u, subsetsPtr, v).
     destruct H3 as [? _]; rewrite <- H3. apply Hvvalid_subsetsGraph'_v.
     Intros v_root. destruct v_root as [subsetsGraph_uv v_root].
     simpl fst in *. simpl snd in *.
@@ -1224,7 +1224,7 @@ Proof.
         a-v,b-u: same
       No: then apply adde_unaffected.
            *)
-          destruct H7 as [p0 ?]. 
+          destruct H7 as [p0 ?].
           apply connected_by_upath_exists_simple_upath in H7. clear p0; destruct H7 as [p [H7 Hp_simpl]].
           assert (exists l : list EType, fits_upath adde l p).
           apply connected_exists_list_edges in H7; auto. destruct H8 as [l ?].
@@ -1282,7 +1282,7 @@ Proof.
                  0 <= j < i + 1 ->
                  ~ In (Znth j sorted) (map wedge_to_cdata (msflist +:: (w, (u, v)))) ->
                  exists p : upath,
-                   c_connected_by_path size adde p 
+                   c_connected_by_path size adde p
                                        (fst (snd (Znth j sorted))) (snd (snd (Znth j sorted))) /\
                    (exists l : list EType,
                        fits_upath adde l p /\

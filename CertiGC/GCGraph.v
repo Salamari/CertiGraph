@@ -2062,7 +2062,7 @@ Proof.
   intros. unfold copy_v_mod_gen_info_list.
   assert (length (firstn to l) = to) by (rewrite firstn_length_le; lia).
   destruct (Nat.lt_ge_cases n to).
-  - rewrite app_nth1 by lia. apply nth_firstn. assumption.
+  - rewrite app_nth1 by lia. apply sublist.nth_firstn. assumption.
   - rewrite Nat.lt_eq_cases in H2. destruct H2. 2: exfalso; intuition auto.
     rewrite <- (firstn_skipn (to + 1) l) at 4. rewrite app_cons_assoc, !app_nth2.
     + do 2 f_equal. rewrite app_length, H1, firstn_length_le by lia. reflexivity.
