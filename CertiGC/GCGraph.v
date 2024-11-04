@@ -548,21 +548,21 @@ Proof. intros. unfold gen_start. if_tac; [apply start_isptr | contradiction]. Qe
 Definition vertex_address (g: LGraph) (v: VType): val :=
   offset_val (WORD_SIZE * vertex_offset g v) (gen_start g (vgeneration v)).
 
-Inductive root_t: Type :=
-| RootUnboxed: Z -> root_t
-| RootOutlier: GC_Pointer -> root_t
-| RootVertex: VType -> root_t.
+Inductive exterior_t: Type :=
+| ExteriorUnboxed: Z -> exterior_t
+| ExteriorOutlier: GC_Pointer -> exterior_t
+| ExteriorVertex: VType -> exterior_t.
 
-#[export] Instance root_t_inhabitant: Inhabitant root_t := RootUnboxed Z.zero.
+#[export] Instance exterior_t_inhabitant: Inhabitant exterior_t := ExteriorUnboxed Z.zero.
 
-Definition root2val (g: LGraph) (fd: root_t) : val :=
+Definition exterior2val (g: LGraph) (fd: exterior_t) : val :=
   match fd with
-  | RootUnboxed z => odd_Z2val z
-  | RootOutlier p => GC_Pointer2val p
-  | RootVertex v => vertex_address g v
+  | ExteriorUnboxed z => odd_Z2val z
+  | ExteriorOutlier p => GC_Pointer2val p
+  | ExteriorVertex v => vertex_address g v
   end.
 
-Definition roots_t: Type := list root_t.
+Definition roots_t: Type := list exterior_t.
 
 Definition outlier_t: Type := list GC_Pointer.
 
@@ -689,40 +689,40 @@ Lemma Zlength_update_rootpairs':
   Qed.
 
 Definition rootpairs_compatible (g: LGraph) (rootpairs: list rootpair) (roots: roots_t) : Prop :=
-  map (root2val g) roots = map rp_val rootpairs.
+  map (exterior2val g) roots = map rp_val rootpairs.
 
 Definition frames_compatible (g: LGraph) (frames: list frame) (roots: roots_t) : Prop :=
-  map (root2val g) roots = map rp_val (frames2rootpairs frames).
+  map (exterior2val g) roots = map rp_val (frames2rootpairs frames).
 
  (* use frames_compatible instead
 Definition fun_thread_arg_compatible
            (g: LGraph) (ti: thread_info) (fi: fun_info) (roots: roots_t) : Prop :=
-  map (root2val g) roots = map ((flip Znth) ti.(ti_args)) fi.(live_roots_indices).
+  map (exterior2val g) roots = map ((flip Znth) ti.(ti_args)) fi.(live_roots_indices).
   *)
 
-Definition root_proj_outlier (r : root_t): option GC_Pointer :=
+Definition exterior_proj_outlier (r : exterior_t): option GC_Pointer :=
   match r with
-  | RootOutlier p => Some p
+  | ExteriorOutlier p => Some p
   | _ => None
   end.
 
-Lemma root_proj_outlier_spec: forall r p, root_proj_outlier r = Some p <-> r = RootOutlier p.
+Lemma exterior_proj_outlier_spec: forall r p, exterior_proj_outlier r = Some p <-> r = ExteriorOutlier p.
 Proof. intros. destruct r; simpl; split; intro S; inversion S; subst; reflexivity. Qed.
 
 Definition roots_outlier_compatible (roots: roots_t) (outlier: outlier_t): Prop :=
-  incl (filter_proj root_proj_outlier roots) outlier.
+  incl (filter_proj exterior_proj_outlier roots) outlier.
 
-Definition root_proj_vertex (r : root_t): option VType :=
+Definition exterior_proj_vertex (r : exterior_t): option VType :=
   match r with
-  | RootVertex v => Some v
+  | ExteriorVertex v => Some v
   | _ => None
   end.
 
-Lemma root_proj_vertex_spec: forall r p, root_proj_vertex r = Some p <-> r = RootVertex p.
+Lemma exterior_proj_vertex_spec: forall r p, exterior_proj_vertex r = Some p <-> r = ExteriorVertex p.
 Proof. intros. destruct r; simpl; split; intro S; inversion S; subst; reflexivity. Qed.
 
 Definition roots_graph_compatible (roots: roots_t) (g: LGraph): Prop :=
-  Forall (graph_has_v g) (filter_proj root_proj_vertex roots).
+  Forall (graph_has_v g) (filter_proj exterior_proj_vertex roots).
 
 Definition roots_compatible (g: LGraph) (outlier: outlier_t) (roots: roots_t): Prop :=
   roots_outlier_compatible roots outlier /\ roots_graph_compatible roots g.
@@ -1434,11 +1434,11 @@ Inductive forward_t: Type :=
 | ForwardVertex: VType -> forward_t
 | ForwardEdge: EType -> forward_t.
 
-Definition root2forward (r: root_t): forward_t :=
+Definition exterior2forward (r: exterior_t): forward_t :=
   match r with
-  | RootUnboxed z => ForwardUnboxed z
-  | RootOutlier p => ForwardOutlier p
-  | RootVertex v => ForwardVertex v
+  | ExteriorUnboxed z => ForwardUnboxed z
+  | ExteriorOutlier p => ForwardOutlier p
+  | ExteriorVertex v => ForwardVertex v
   end.
 
 Definition field2forward (f: field_t): forward_t :=
@@ -1455,7 +1455,7 @@ Inductive forward_p_type: Type :=
 Definition forward_p2forward_t
            (p: forward_p_type) (roots: roots_t) (g: LGraph): forward_t :=
   match p with
-  | ForwardPntRoot root_index => root2forward (Znth root_index roots)
+  | ForwardPntRoot root_index => exterior2forward (Znth root_index roots)
   | ForwardPntVertex v n => if (vlabel g v).(raw_mark) && (n =? 0)
                            then ForwardVertex (vlabel g v).(copied_vertex)
                            else field2forward (Znth n (make_fields g v))
@@ -1733,31 +1733,31 @@ Lemma upd_roots_outlier_compatible: forall roots outlier z v,
     roots_outlier_compatible roots outlier ->
     (* forall v : VType, *)
     (*   graph_has_v g v -> *)
-    roots_outlier_compatible (upd_Znth z roots (RootVertex v)) outlier.
+    roots_outlier_compatible (upd_Znth z roots (ExteriorVertex v)) outlier.
 Proof.
   intros. do 2 red in H |-* . intros.
-  rewrite <- (filter_proj_In_iff root_proj_outlier_spec) in H0.
+  rewrite <- (filter_proj_In_iff exterior_proj_outlier_spec) in H0.
   apply In_upd_Znth in H0. destruct H0.
   inversion H0. apply H.
-  rewrite <- (filter_proj_In_iff root_proj_outlier_spec). assumption.
+  rewrite <- (filter_proj_In_iff exterior_proj_outlier_spec). assumption.
 Qed.
 
 Lemma upd_Znth_graph_compatible: forall g roots z,
     roots_graph_compatible roots g ->
     forall v : VType,
       graph_has_v g v ->
-      roots_graph_compatible (upd_Znth z roots (RootVertex v)) g.
+      roots_graph_compatible (upd_Znth z roots (ExteriorVertex v)) g.
 Proof.
   intros. red in H |-* . rewrite Forall_forall in H |-* . intros.
-  rewrite <- (filter_proj_In_iff root_proj_vertex_spec) in H1.
+  rewrite <- (filter_proj_In_iff exterior_proj_vertex_spec) in H1.
   apply In_upd_Znth in H1. destruct H1. inversion H1; assumption.
-  apply H. rewrite <- (filter_proj_In_iff root_proj_vertex_spec). assumption.
+  apply H. rewrite <- (filter_proj_In_iff exterior_proj_vertex_spec). assumption.
 Qed.
 
 Lemma upd_roots_compatible: forall g roots outlier z,
     roots_compatible g outlier roots ->
     forall v : VType, graph_has_v g v ->
-                      roots_compatible g outlier (upd_Znth z roots (RootVertex v)).
+                      roots_compatible g outlier (upd_Znth z roots (ExteriorVertex v)).
 Proof.
   intros. destruct H. split.
   - apply upd_roots_outlier_compatible; assumption.
@@ -1766,30 +1766,30 @@ Qed.
 
 Local Close Scope Z_scope.
 
-Definition upd_root (from to: nat)
-           (g: LGraph) (root: root_t) : root_t :=
-  match root with
-  | RootVertex v => if Nat.eq_dec (vgeneration v) from
-                   then if (vlabel g v).(raw_mark)
-                        then RootVertex (vlabel g v).(copied_vertex)
-                        else RootVertex (new_copied_v g to)
-                   else root
-  | _ => root
+Definition upd_exterior (from to: nat)
+           (g: LGraph) (extr: exterior_t) : exterior_t :=
+  match extr with
+  | ExteriorVertex v => if Nat.eq_dec (vgeneration v) from
+                       then if (vlabel g v).(raw_mark)
+                            then ExteriorVertex (vlabel g v).(copied_vertex)
+                            else ExteriorVertex (new_copied_v g to)
+                       else extr
+  | _ => extr
   end.
 
 Definition upd_roots (from to: nat) (forward_p: forward_p_type)
            (g: LGraph) (roots: roots_t) : roots_t :=
   match forward_p with
   | ForwardPntVertex _ _ => roots
-  | ForwardPntRoot index => upd_Znth index roots (upd_root from to g (Znth index roots))
+  | ForwardPntRoot index => upd_Znth index roots (upd_exterior from to g (Znth index roots))
   end.
 
   Inductive forward_roots_relation (from to: nat): forall (roots1: roots_t) (g1: LGraph) (roots2: roots_t) (g2: LGraph), Prop :=
   | fwd_roots_nil: forall g, forward_roots_relation from to nil g nil g
   | fwd_roots_cons: forall r roots1 g1 roots2 g2 g3,
-       forward_relation from to 0 (root2forward r) g1 g2 ->
+       forward_relation from to 0 (exterior2forward r) g1 g2 ->
        forward_roots_relation from to roots1 g2 roots2 g3 ->
-       forward_roots_relation from to (r::roots1) g1 (upd_root from to g1 r :: roots2) g3.
+       forward_roots_relation from to (r::roots1) g1 (upd_exterior from to g1 r :: roots2) g3.
 
 Definition nth_space (h: heap) (n: nat): space :=
   nth n h.(spaces) null_space.
@@ -2730,7 +2730,7 @@ Proof. intros. destruct H0. split; [|apply lcv_rgc_unchanged]; assumption. Qed.
 Lemma lcv_roots_graph_compatible: forall g roots v to z,
     graph_has_gen g to ->
     roots_graph_compatible roots g ->
-    roots_graph_compatible (upd_Znth z roots (RootVertex (new_copied_v g to)))
+    roots_graph_compatible (upd_Znth z roots (ExteriorVertex (new_copied_v g to)))
                            (lgraph_copy_v g v to).
 Proof.
   intros. apply upd_Znth_graph_compatible.
@@ -2743,7 +2743,7 @@ Lemma lcv_roots_compatible: forall g roots outlier v to z,
     graph_has_gen g to ->
     roots_compatible g outlier roots ->
     roots_compatible (lgraph_copy_v g v to) outlier
-                     (upd_Znth z roots (RootVertex (new_copied_v g to))).
+                     (upd_Znth z roots (ExteriorVertex (new_copied_v g to))).
 Proof.
   intros. destruct H0. split.
   - apply upd_roots_outlier_compatible; assumption.
@@ -2788,7 +2788,7 @@ Proof.
  f_equal.
  - destruct a; auto. destruct v0; auto.
     hnf in H0; simpl in H0. inv H0.
-    unfold root2val. apply H1; auto.
+    unfold exterior2val. apply H1; auto.
  - apply IHroots; auto.
    red in H0 |- *.
    destruct a; auto. destruct v0; auto. simpl in H0. inv H0; auto.
@@ -2804,14 +2804,14 @@ Lemma upd_rootpairs_compatible: forall g rootpairs roots z,
       rootpairs_compatible g
       (update_rootpairs rootpairs
             (upd_Znth z (map rp_val rootpairs) (vertex_address g v)))
-       (upd_Znth z roots (RootVertex v)).
+       (upd_Znth z roots (ExteriorVertex v)).
 Proof.
   intros. red in H |-* .
-  assert (0 <= z < Zlength (map (root2val g) roots)) by (list_solve). clear HB.
+  assert (0 <= z < Zlength (map (exterior2val g) roots)) by (list_solve). clear HB.
   rewrite <- upd_Znth_map.
   set (r := map _ roots) in *. clearbody r; clear roots.
   subst r.
-  simpl root2val.
+  simpl exterior2val.
   set (u := vertex_address g v). clearbody u. clear g v.
   revert z H0; induction rootpairs as [ | [a r] rest]; simpl; intros.
   - rewrite Zlength_nil in H0; lia.
@@ -2831,7 +2831,7 @@ Lemma lcv_rootpairs_compatible: forall
       (update_rootpairs rootpairs
         (upd_Znth z (map rp_val rootpairs)
           (vertex_address g (new_copied_v g to))))
-      (upd_Znth z roots (RootVertex (new_copied_v g to))).
+      (upd_Znth z roots (ExteriorVertex (new_copied_v g to))).
 Proof.
   intros. rewrite <- (lcv_vertex_address_new g v to H).
   apply upd_rootpairs_compatible; auto.
@@ -2979,7 +2979,7 @@ Lemma lcv_super_compatible: forall
       (update_rootpairs rootpairs
          (upd_Znth z (map rp_val rootpairs)
             (vertex_address g (new_copied_v g to))))
-      (upd_Znth z roots (RootVertex (new_copied_v g to))) outlier.
+      (upd_Znth z roots (ExteriorVertex (new_copied_v g to))) outlier.
 Proof.
   intros. destruct H1 as [? [? [? ?]]]. split; [|split; [|split]].
   - apply lcv_graph_heap_compatible; assumption.
@@ -4000,10 +4000,10 @@ Proof.
 Qed.
 
 Lemma root_in_outlier: forall (roots: roots_t) outlier p,
-    In (RootOutlier p) roots ->
-    incl (filter_proj root_proj_outlier roots) outlier -> In p outlier.
+    In (ExteriorOutlier p) roots ->
+    incl (filter_proj exterior_proj_outlier roots) outlier -> In p outlier.
 Proof.
-  intros. apply H0. rewrite <- (filter_proj_In_iff root_proj_outlier_spec).
+  intros. apply H0. rewrite <- (filter_proj_In_iff exterior_proj_outlier_spec).
   assumption.
 Qed.
 
@@ -4055,7 +4055,7 @@ Opaque upd_roots.
 
 Lemma frl_add_tail: forall from to l i g1 g2 g3 roots1 roots2,
     forward_roots_loop from to l roots1 g1 roots2 g2 ->
-    forward_relation from to O (root2forward (Znth (Z.of_nat i) roots2)) g2 g3 ->
+    forward_relation from to O (exterior2forward (Znth (Z.of_nat i) roots2)) g2 g3 ->
     forward_roots_loop
       from to (l +:: i) roots1 g1
       (upd_roots from to (inl (Z.of_nat i)) g2 roots2) g3.
@@ -4140,8 +4140,8 @@ Proof.
 Qed.
 
 Definition np_roots_rel from (roots roots': roots_t) (l: list Z) : Prop :=
-  forall v j, Znth j roots' = RootVertex v ->
-         (In j l -> vgeneration v <> from) /\ (~ In j l -> Znth j roots = RootVertex v).
+  forall v j, Znth j roots' = ExteriorVertex v ->
+         (In j l -> vgeneration v <> from) /\ (~ In j l -> Znth j roots = ExteriorVertex v).
 
 Lemma upd_roots_not_pointing: forall from to i g roots roots',
     copy_compatible g -> roots_graph_compatible roots g -> from <> to ->
@@ -4156,8 +4156,8 @@ Proof.
     2: rewrite Znth_outofbounds in H5 by lia; inversion H5. split; auto.
     destruct (Z_lt_le_dec j 0); auto. rewrite Znth_outofbounds in H5 by lia.
     inversion H5. }
-  unfold upd_roots, upd_root in *.
-  simpl in H4. destruct (Znth i roots) eqn:? .
+  unfold upd_roots, upd_exterior in *.
+  simpl in H4. destruct (Znth i roots) eqn:Heqr .
   - assert (roots' = roots) by (rewrite <- Heqr, upd_Znth_unchanged in H4; auto). clear H4.
     subst roots'. split; intros; auto. destruct H4; auto. congruence.
   - assert (roots' = roots) by (rewrite <- Heqr, upd_Znth_unchanged in H4; auto). clear H4.
@@ -4168,7 +4168,7 @@ Proof.
         rewrite upd_Znth_same in H5 by auto.
         inversion H5. red in H0. rewrite Forall_forall in H0.
         assert (graph_has_v g v0). {
-          apply H0. rewrite <- (filter_proj_In_iff root_proj_vertex_spec), <- Heqr.
+          apply H0. rewrite <- (filter_proj_In_iff exterior_proj_vertex_spec), <- Heqr.
           apply Znth_In; assumption. }
         hnf in H. destruct (H _ H4 Heqb) as [_ ?]. auto.
       * assert (i<>j) by tauto. rewrite upd_Znth_diff in H5 by auto. auto.
@@ -4264,7 +4264,7 @@ Proof.
   assert (roots_outlier_compatible
             (upd_Znth root_number roots (Znth root_number roots)) outlier)
     by (rewrite upd_Znth_unchanged'; auto).
-  unfold upd_root.
+  unfold upd_exterior.
   destruct (Znth root_number roots) eqn: ?; auto.
   if_tac; auto.
   destruct (raw_mark (vlabel g v)); apply upd_roots_outlier_compatible; assumption.
@@ -4277,14 +4277,14 @@ Lemma fr_roots_graph_compatible: forall depth from to p g g' roots,
     roots_graph_compatible (upd_roots from to p g roots) g'.
 Proof.
   intros.
-  unfold upd_roots, upd_root in *.
+  unfold upd_roots, upd_exterior in *.
   destruct p.
-  - simpl in *. destruct (Znth root_number roots) eqn: ?; simpl in H2.
+  - simpl in *. destruct (Znth root_number roots) eqn:Heqr; simpl in H2.
     + rewrite <- Heqr. rewrite upd_Znth_unchanged'. inversion H2; subst; assumption.
     + rewrite <- Heqr. rewrite upd_Znth_unchanged'. inversion H2; subst; assumption.
     + assert (graph_has_v g v). {
         red in H4. rewrite Forall_forall in H4. apply H4.
-        rewrite <- (filter_proj_In_iff root_proj_vertex_spec), <- Heqr. apply Znth_In.
+        rewrite <- (filter_proj_In_iff exterior_proj_vertex_spec), <- Heqr. apply Znth_In.
         assumption. }
       inversion H2; destruct (Nat.eq_dec (vgeneration v) from);
         try contradiction; subst; try assumption.
@@ -4295,7 +4295,7 @@ Proof.
       * destruct (raw_mark (vlabel g v)) eqn:? . 1: inversion H9.
         apply lcv_roots_graph_compatible; assumption.
       * destruct (raw_mark (vlabel g v)) eqn:? . 1: inversion H8.
-        remember (upd_Znth root_number roots (RootVertex (new_copied_v g to))) as roots'.
+        remember (upd_Znth root_number roots (ExteriorVertex (new_copied_v g to))) as roots'.
         assert (roots_graph_compatible roots' new_g) by
             (subst; subst new_g; apply lcv_roots_graph_compatible; assumption).
         assert (raw_mark (vlabel new_g (new_copied_v g to)) = false). {
@@ -4359,7 +4359,7 @@ Qed.
 *)
 
 Definition roots_have_no_gen (roots: roots_t) (gen: nat): Prop :=
-  forall v, In (RootVertex v) roots -> vgeneration v <> gen.
+  forall v, In (ExteriorVertex v) roots -> vgeneration v <> gen.
 
 Lemma frr_not_pointing: forall from to roots1 g1 roots2 g2,
     copy_compatible g1 -> roots_graph_compatible roots1 g1 -> from <> to ->
@@ -4373,7 +4373,7 @@ Proof.
   intros ? ?. destruct H6.
   - clear IHforward_roots_relation.
     pose proof upd_roots_not_pointing from to 0 g1 (r::roots1)
-      (upd_root from to g1 r :: roots1) H0 H2
+      (upd_exterior from to g1 r :: roots1) H0 H2
         H1 ltac:(list_solve).
     simpl in H7. rewrite upd_Znth0 in H7. rewrite Znth_0_cons in H7.
     specialize (H7 (eq_refl _) v 0).
@@ -4433,7 +4433,7 @@ Proof.
   specialize (H _ H1). destruct H. split.
   - rewrite graph_has_gen_reset. assumption.
   - rewrite gen_has_index_reset. split. 1: assumption.
-    rewrite <- (filter_proj_In_iff root_proj_vertex_spec) in H1. apply H0 in H1. auto.
+    rewrite <- (filter_proj_In_iff exterior_proj_vertex_spec) in H1. apply H0 in H1. auto.
 Qed.
 
 Lemma roots_compatible_reset: forall g gen outlier roots,
@@ -4611,7 +4611,7 @@ Proof.
 Qed.
 
 Lemma fr_O_dst_unchanged_root: forall from to r g g',
-    forward_relation from to O (root2forward r) g g' ->
+    forward_relation from to O (exterior2forward r) g g' ->
     forall e, graph_has_v g (fst e) -> dst g e = dst g' e.
 Proof.
   intros. destruct r; simpl in H; inversion H; subst; try reflexivity;
@@ -5167,9 +5167,9 @@ Lemma fr_O_no_dangling_dst': forall from to p g g' roots,
     no_dangling_dst g -> no_dangling_dst g'.
 Proof.
   intros. eapply fr_O_no_dangling_dst; eauto. destruct p; simpl.
-  - destruct (Znth root_number roots) eqn:? ; simpl; auto. simpl in H. hnf in H1.
+  - destruct (Znth root_number roots) eqn:Heqr; simpl; auto. simpl in H. hnf in H1.
     rewrite Forall_forall in H1. apply H1.
-    rewrite <- (filter_proj_In_iff root_proj_vertex_spec), <- Heqr.
+    rewrite <- (filter_proj_In_iff exterior_proj_vertex_spec), <- Heqr.
     apply Znth_In. assumption.
   - destruct H as [? [? [? [? ?]]]]. rewrite H6. simpl.
     apply vertex_pos_forward_t_compatible; assumption.
@@ -5668,7 +5668,7 @@ Proof.
   intros. unfold rootpairs_compatible in *. simpl. rewrite <- H. clear H.
   apply map_ext_in. intros. destruct a; simpl; try reflexivity.
   apply ang_vertex_address_old. red in H0. rewrite Forall_forall in H0. apply H0.
-  rewrite <- (filter_proj_In_iff root_proj_vertex_spec). assumption.
+  rewrite <- (filter_proj_In_iff exterior_proj_vertex_spec). assumption.
 Qed.
 
 Lemma super_compatible_add: forall g ti gi sp i (Hs: 0 <= i < MAX_SPACES) roots out,

@@ -68,10 +68,10 @@ Ltac tc_val_Znth := entailer!!; rewrite Znth_map by assumption;
                     try assumption.
 
 Lemma gather_thread_info_rep:
-  forall (v1 v2: val) sh t_info ti , 
+  forall (v1 v2: val) sh t_info ti ,
    data_at sh thread_info_type (v1,(v2, (ti_heap_p t_info, (ti_args t_info,(ti_fp t_info, (Vptrofs(ti_nalloc t_info),nullval)))))) ti
    * frames_rep sh (ti_frames t_info)
-   * data_at sh heap_type (@map space (val * (val * (val*val)))  space_tri (spaces (ti_heap t_info))) (ti_heap_p t_info) 
+   * data_at sh heap_type (@map space (val * (val * (val*val)))  space_tri (spaces (ti_heap t_info))) (ti_heap_p t_info)
    * heap_rest_rep (ti_heap t_info)
    |-- thread_info_rep sh t_info ti.
 Proof.
@@ -147,7 +147,7 @@ Proof.
     unfold thread_info_rep, heap_rep. Intros.
     unfold heap_struct_rep. assert (0 <= i + 1 < Zlength (spaces (ti_heap t_info'))) by
         (rewrite spaces_size; rep_lia).
-    pose proof (space_start_is_pointer_or_null _ _ _ (proj1 H8) H14). 
+    pose proof (space_start_is_pointer_or_null _ _ _ (proj1 H8) H14).
     forward.
       entailer!!.
       1: entailer!!; rewrite Znth_map by assumption; unfold space_tri; assumption.
@@ -253,7 +253,7 @@ Proof.
                  (space_start sp,
                   (offset_val (WORD_SIZE * total_space sp) (space_start sp),
                    offset_val (WORD_SIZE * total_space sp) (space_start sp)))) with
-            (space_tri sp) by          
+            (space_tri sp) by
             (unfold space_tri; do 2 f_equal; subst sp; simpl;
              rewrite isptr_offset_val_zero by assumption; reflexivity).
         thaw FR.
@@ -295,7 +295,7 @@ Proof.
         replace_SEP 0 (thread_info_rep sh t_info1 ti) by
             (unfold thread_info_rep, heap_rep; entailer!!). rewrite (graph_rep_add g' gi); auto.
         3: apply H9.
-        2: apply graph_unmarked_copy_compatible, H9. 
+        2: apply graph_unmarked_copy_compatible, H9.
         rewrite <- Heqg1.
         assert (graph_has_gen g1 (Z.to_nat (i + 1))). {
           subst g1. rewrite ang_graph_has_gen. right. clear -H13 H16 H7.
@@ -308,7 +308,7 @@ Proof.
             (subst g1 t_info1; apply gcc_add; assumption).
         Local Opaque super_compatible. Exists g1 t_info1. entailer!!.
     + forward. remember (space_start (Znth (i + 1) (spaces (ti_heap t_info')))).
-      assert (isptr v). { 
+      assert (isptr v). {
         destruct v; try contradiction. simpl in H15. subst i0. contradiction.
         simpl. exact I. } subst v. rewrite <- (space_start_isptr_iff g') in H17; auto.
       2: destruct H8; auto. assert (new_gen_relation (Z.to_nat (i + 1)) g' g') by
@@ -335,7 +335,7 @@ Proof.
       Intros vret. destruct vret as [[g2 h2] roots2].
       simpl fst in *. simpl snd in *.
       set (fr2 := update_frames _ _) in *.
-      thaw FR1.      
+      thaw FR1.
       pose (t_info2 := {| ti_heap_p := ti_heap_p t_info1;
                           ti_heap := h2; ti_args := ti_args t_info1;
                           arg_size := arg_size t_info1;
@@ -384,7 +384,7 @@ Proof.
          destruct H16 as [? [? [? ?]]], H28;
             eapply (do_gen_gcc g1 (ti_heap t_info1) roots'); try eassumption.
             split; auto.
-      } 
+      }
       assert (firstn_gen_clear g2 (Z.to_nat (i + 1))) by
           (rewrite H23; eapply do_gen_firstn_gen_clear; eauto).
       assert (safe_to_copy_to_except g2 (Z.to_nat (i + 1))) by
@@ -396,16 +396,16 @@ Proof.
          by (erewrite ti_rel_token_the_same; eauto; entailer!!; apply derives_refl).
       simpl spaces in *.
       assert (FSE': frame_shells_eq (ti_frames t_info)
-               (update_frames (ti_frames t_info1) (map (root2val g2) roots2))). {
+               (update_frames (ti_frames t_info1) (map (exterior2val g2) roots2))). {
             eapply frame_shells_eq_trans. eassumption.
             apply sc_Zlength in H8, H16.
-            destruct H29 as [? [? [FRR _]]]. 
+            destruct H29 as [? [? [FRR _]]].
             apply frr_Zlength_roots in FRR.
             clear - FRR H8 H16.
             forget (Zlength roots') as n; subst n.
             rewrite H16 in FRR; clear H16.
             set (frs := ti_frames t_info1) in *; clearbody frs.
-            rewrite <- (Zlength_map _ _ (root2val g2) roots2) in FRR.
+            rewrite <- (Zlength_map _ _ (exterior2val g2) roots2) in FRR.
             set (al := map _ roots2) in *. clearbody al.
             revert al FRR; induction frs as [ | [?? r]]; simpl; intros.
             constructor.

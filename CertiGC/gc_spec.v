@@ -201,7 +201,7 @@ Definition forward_spec :=
          heap_rep sh h hp)
   POST [tvoid]
     EX g': LGraph, EX h': heap, EX roots': roots_t,
-    PROP (super_compatible g' h' (update_rootpairs rootpairs (map (root2val g') roots'))  roots' outlier;
+    PROP (super_compatible g' h' (update_rootpairs rootpairs (map (exterior2val g') roots'))  roots' outlier;
           roots' = upd_roots from to forward_p g roots;
           forward_relation from to (Z.to_nat depth)
                            (forward_p2forward_t forward_p roots g) g g';
@@ -211,7 +211,7 @@ Definition forward_spec :=
     SEP (all_string_constants rsh gv;
          outlier_rep outlier;
          graph_rep g';
-         roots_rep sh (update_rootpairs rootpairs (map (root2val g') roots'));
+         roots_rep sh (update_rootpairs rootpairs (map (exterior2val g') roots'));
          heap_rep sh h' hp).
 
 Definition forward_roots_spec :=
@@ -239,7 +239,7 @@ Definition forward_roots_spec :=
          heap_rep sh h hp)
   POST [tvoid]
     EX g' : LGraph, EX h': heap, EX roots': roots_t,
-    PROP (super_compatible g' h' (frames2rootpairs (update_frames fr (map (root2val g') roots'))) roots' outlier;
+    PROP (super_compatible g' h' (frames2rootpairs (update_frames fr (map (exterior2val g') roots'))) roots' outlier;
           forward_roots_relation from to roots g roots' g';
           forward_condition g' h' from to;
           heap_relation h h')
@@ -247,7 +247,7 @@ Definition forward_roots_spec :=
     SEP (all_string_constants rsh gv;
          outlier_rep outlier;
          graph_rep g';
-         frames_rep sh (update_frames fr (map (root2val g') roots'));
+         frames_rep sh (update_frames fr (map (exterior2val g') roots'));
          heap_rep sh h' hp).
 
 Definition forward_remset_spec :=
@@ -323,14 +323,14 @@ Definition do_generation_spec :=
          heap_rep sh h hp)
   POST [tvoid]
     EX g' : LGraph, EX h': heap, EX roots': roots_t,
-    PROP (super_compatible g' h' (frames2rootpairs (update_frames fr (map (root2val g') roots'))) roots' outlier;
+    PROP (super_compatible g' h' (frames2rootpairs (update_frames fr (map (exterior2val g') roots'))) roots' outlier;
           heap_relation h h';
           do_generation_relation from to roots roots' g g')
     RETURN ()
     SEP (all_string_constants rsh gv;
          outlier_rep outlier;
          graph_rep g';
-         frames_rep sh (update_frames fr (map (root2val g') roots'));
+         frames_rep sh (update_frames fr (map (exterior2val g') roots'));
          heap_rep sh h' hp).
 
 Definition create_space_spec :=

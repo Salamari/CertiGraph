@@ -148,15 +148,15 @@ Qed.
 
 (** Quasi-Isomorphism to Full-Isomorphism *)
 
-Definition root_map (vmap: VType -> VType) (r: root_t): root_t :=
+Definition exterior_map (vmap: VType -> VType) (r: exterior_t): exterior_t :=
   match r with
-  | RootUnboxed z => RootUnboxed z
-  | RootOutlier p => RootOutlier p
-  | RootVertex r => RootVertex (vmap r)
+  | ExteriorUnboxed z => ExteriorUnboxed z
+  | ExteriorOutlier p => ExteriorOutlier p
+  | ExteriorVertex r => ExteriorVertex (vmap r)
   end.
 
-Lemma bijective_root_map: forall vmap1 vmap2,
-    bijective vmap1 vmap2 -> bijective (root_map vmap1) (root_map vmap2).
+Lemma bijective_exterior_map: forall vmap1 vmap2,
+    bijective vmap1 vmap2 -> bijective (exterior_map vmap1) (exterior_map vmap2).
 Proof.
   intros. destruct H. split; intros.
   - now destruct x, y; inversion H; [| |apply injective in H1; subst].
@@ -165,12 +165,12 @@ Qed.
 
 Definition gc_graph_iso (g1: LGraph) (roots1: roots_t)
            (g2: LGraph) (roots2: roots_t): Prop :=
-  let vertices1 := filter_proj root_proj_vertex roots1 in
-  let vertices2 := filter_proj root_proj_vertex roots2 in
+  let vertices1 := filter_proj exterior_proj_vertex roots1 in
+  let vertices2 := filter_proj exterior_proj_vertex roots2 in
   let sub_g1 := reachable_sub_labeledgraph g1 vertices1 in
   let sub_g2 := reachable_sub_labeledgraph g2 vertices2 in
   exists vmap12 vmap21 emap12 emap21,
-    roots2 = map (root_map vmap12) roots1 /\
+    roots2 = map (exterior_map vmap12) roots1 /\
     label_preserving_graph_isomorphism_explicit
       sub_g1 sub_g2 vmap12 vmap21 emap12 emap21.
 
@@ -180,13 +180,13 @@ Proof.
   clear. induction roots; simpl; auto. rewrite <- IHroots. f_equal. destruct a; auto.
 Qed.
 
-Lemma map_root_map_bijective:
+Lemma map_exterior_map_bijective:
   forall (roots1 roots2 : roots_t) (vmap12 vmap21 : VType -> VType),
-    roots2 = map (root_map vmap12) roots1 ->
-    bijective vmap12 vmap21 -> roots1 = map (root_map vmap21) roots2.
+    roots2 = map (exterior_map vmap12) roots1 ->
+    bijective vmap12 vmap21 -> roots1 = map (exterior_map vmap21) roots2.
 Proof.
   intros roots1 roots2 vmap12 vmap21 H H0.
-  apply bijective_root_map, bijective_map, bijective_sym in H0. destruct H0.
+  apply bijective_exterior_map, bijective_map, bijective_sym in H0. destruct H0.
   now rewrite H, surjective.
 Qed.
 
@@ -196,7 +196,7 @@ Proof.
   intros. unfold gc_graph_iso in *.
   destruct H as [vmap12 [vmap21 [emap12 [emap21 [? ?]]]]].
   exists vmap21, vmap12, emap21, emap12. split.
-  - destruct H0 as [[?H _] _]. eapply map_root_map_bijective; eauto.
+  - destruct H0 as [[?H _] _]. eapply map_exterior_map_bijective; eauto.
   - now apply lp_graph_iso_exp_sym.
 Qed.
 
@@ -393,7 +393,7 @@ Qed.
 Definition from_gen_quasi_spec
            (g: LGraph) (roots: roots_t) (l: list VType) gen: Prop :=
   NoDup l /\ forall v,
-    (reachable_through_set g (filter_proj root_proj_vertex roots) v /\ vgeneration v = gen) <->
+    (reachable_through_set g (filter_proj exterior_proj_vertex roots) v /\ vgeneration v = gen) <->
     In v l.
 
 Definition to_gen_spec (g1 g2: LGraph) (l: list VType) gen: Prop :=
@@ -401,7 +401,7 @@ Definition to_gen_spec (g1 g2: LGraph) (l: list VType) gen: Prop :=
   forall v, In v l -> vgeneration v = gen.
 
 Definition roots_map (l: list (VType * VType)): roots_t -> roots_t :=
-  map (root_map (list_bi_map l)).
+  map (exterior_map (list_bi_map l)).
 
 Definition gc_graph_quasi_iso (g1: LGraph) (roots1: roots_t)
            (g2: LGraph) (roots2: roots_t) (from to: nat): Prop :=
@@ -476,7 +476,7 @@ Proof.
     - rewrite !list_bi_map_not_In; auto. intro; apply n; apply gepl_InEither in H23.
       auto. }
   assert (Hd: forall e,
-             evalid (reachable_sub_labeledgraph g1 (filter_proj root_proj_vertex roots1)) e
+             evalid (reachable_sub_labeledgraph g1 (filter_proj exterior_proj_vertex roots1)) e
              -> vmap (dst g1 e) = dst g2 (emap e)). {
     intros. simpl in H21. destruct H21 as [? [? ?]]. pose proof H21.
     rewrite H19 in H21. destruct H21. rewrite H20 in *. rewrite <- H1 in H21.
@@ -523,7 +523,7 @@ Proof.
       destruct H as [_ [_ [_ ?]]]. apply H; auto.
       apply reachable_through_set_foot_valid in H23. auto. }
   assert (He: forall e,
-             evalid (reachable_sub_labeledgraph g1 (filter_proj root_proj_vertex roots1)) e
+             evalid (reachable_sub_labeledgraph g1 (filter_proj exterior_proj_vertex roots1)) e
              -> evalid (remove_nth_gen_ve g2 from) (emap e)). {
     intros. rewrite Heqemap. simpl in H21. destruct H21 as [? [? ?]]. pose proof H21.
     rewrite H15, graph_has_e_reset. rewrite H19 in H21. destruct H21.
@@ -544,7 +544,7 @@ Proof.
       apply n. red. rewrite Heqp, in_app_iff, <- H8. left. symmetry in H26.
       rewrite H20 in H22. split; assumption. }
   assert (Hv: forall x,
-             vvalid (reachable_sub_labeledgraph g1 (filter_proj root_proj_vertex roots1)) x
+             vvalid (reachable_sub_labeledgraph g1 (filter_proj exterior_proj_vertex roots1)) x
              -> vvalid (remove_nth_gen_ve g2 from) (vmap x)). {
     intros. simpl in H21. destruct H21. rewrite Heqvmap in *. rewrite H14.
     rewrite graph_has_v_reset. destruct (InEither_dec x vpl).
@@ -556,20 +556,20 @@ Proof.
       split. 1: apply H; auto. intro. apply n. clear n. red.
       rewrite Heqp, in_app_iff. left. rewrite <- H8. split; auto. }
   assert (Hp: forall v,
-             vvalid (reachable_sub_labeledgraph g1 (filter_proj root_proj_vertex roots1)) v
+             vvalid (reachable_sub_labeledgraph g1 (filter_proj exterior_proj_vertex roots1)) v
              -> reachable_through_set (remove_nth_gen_ve g2 from)
-                 (filter_proj root_proj_vertex roots2) (vmap v)). {
+                 (filter_proj exterior_proj_vertex roots2) (vmap v)). {
     intros. simpl in H21. destruct H21. unfold reachable_through_set in H22 |-* .
     destruct H22 as [s [? ?]].
     assert (forall x, reachable g1 s x ->
-                      reachable_through_set g1 (filter_proj root_proj_vertex roots1) x) by
+                      reachable_through_set g1 (filter_proj exterior_proj_vertex roots1) x) by
         (intros; exists s; split; assumption).
-    rewrite <- (filter_proj_In_iff root_proj_vertex_spec) in H22.
-    apply (in_map (root_map vmap)) in H22. rewrite <- H5 in H22.
-    simpl in H22. apply (filter_proj_In_iff root_proj_vertex_spec) in H22. exists (vmap s).
+    rewrite <- (filter_proj_In_iff exterior_proj_vertex_spec) in H22.
+    apply (in_map (exterior_map vmap)) in H22. rewrite <- H5 in H22.
+    simpl in H22. apply (filter_proj_In_iff exterior_proj_vertex_spec) in H22. exists (vmap s).
     split; auto. unfold reachable, reachable_by in H23. destruct H23 as [p ?].
     assert (forall e, In e (snd p) -> evalid (reachable_sub_labeledgraph
-                                          g1 (filter_proj root_proj_vertex roots1)) e). {
+                                          g1 (filter_proj exterior_proj_vertex roots1)) e). {
       intros. simpl. split.
       - destruct H23 as [? [? ?]]. destruct p. eapply valid_path_evalid; eauto.
       - destruct (reachable_path_edge_in _ _ _ _ H23 _ H25).
@@ -661,7 +661,7 @@ Proof.
   assert (Hvb: bijective vmap vmap) by (subst; apply bijective_list_bi_map; auto).
   assert (Hd': forall e,
              evalid (reachable_sub_labeledgraph
-                       (reset_graph from g2) (filter_proj root_proj_vertex roots2)) e ->
+                       (reset_graph from g2) (filter_proj exterior_proj_vertex roots2)) e ->
              vmap (dst g2 e) = dst g1 (emap e)). {
     intros. destruct H21 as [? [? ?]]. simpl in H23. pose proof H21. rename H24 into E.
     rewrite remove_ve_dst_unchanged in H23. rewrite H15, graph_has_e_reset in H21.
@@ -696,24 +696,24 @@ Proof.
       rewrite H10 in H31. destruct H31. contradiction. }
   assert (Hp': forall v,
              vvalid (reachable_sub_labeledgraph (reset_graph from g2)
-                       (filter_proj root_proj_vertex roots2)) v ->
-             reachable_through_set g1 (filter_proj root_proj_vertex roots1) (vmap v)). {
+                       (filter_proj exterior_proj_vertex roots2)) v ->
+             reachable_through_set g1 (filter_proj exterior_proj_vertex roots1) (vmap v)). {
     intros. simpl in H21. destruct H21. unfold reachable_through_set in H22 |-* .
     destruct H22 as [s [? ?]].
     assert (forall x, reachable (remove_nth_gen_ve g2 from) s x ->
                       reachable_through_set (remove_nth_gen_ve g2 from)
-                        (filter_proj root_proj_vertex roots2) x) by
+                        (filter_proj exterior_proj_vertex roots2) x) by
         (intros; exists s; split; assumption).
-    rewrite <- (filter_proj_In_iff root_proj_vertex_spec) in H22. rewrite H5 in H22.
-    apply (in_map (root_map vmap)) in H22.
-    rewrite (surjective _ _ (bijective_map _ _ (bijective_root_map _ _ Hvb))) in H22.
-    simpl in H22. apply (filter_proj_In_iff root_proj_vertex_spec) in H22. exists (vmap s).
+    rewrite <- (filter_proj_In_iff exterior_proj_vertex_spec) in H22. rewrite H5 in H22.
+    apply (in_map (exterior_map vmap)) in H22.
+    rewrite (surjective _ _ (bijective_map _ _ (bijective_exterior_map _ _ Hvb))) in H22.
+    simpl in H22. apply (filter_proj_In_iff exterior_proj_vertex_spec) in H22. exists (vmap s).
     split; auto. unfold reachable, reachable_by in H23. destruct H23 as [p ?].
     assert (forall e,
                In e (snd p) ->
                evalid (reachable_sub_labeledgraph
                          (remove_nth_gen_ve g2 from)
-                         (filter_proj root_proj_vertex roots2)) e). {
+                         (filter_proj exterior_proj_vertex roots2)) e). {
       intros. simpl. split.
       - destruct H23 as [? [? ?]]. destruct p. eapply valid_path_evalid; eauto.
       - destruct (reachable_path_edge_in _ _ _ _ H23 _ H25).
@@ -1169,7 +1169,7 @@ Proof.
   rewrite <- H1 in H5. destruct H5 as [_ [_ ?]]. assumption.
 Qed.
 
-Lemma root_t_eq_dec: forall r1 r2: root_t, {r1 = r2} + {r1 <> r2}.
+Lemma exterior_t_eq_dec: forall r1 r2: exterior_t, {r1 = r2} + {r1 <> r2}.
 Proof.
   intros.
   destruct r1, r2; try (right; discriminate).
@@ -1258,7 +1258,7 @@ Qed.
 Definition restricted_roots_map (index: Z)
            (roots: roots_t) (l: list (VType * VType)): roots_t :=
            (* could avoid restricted_map and just use upd_Znth *)
-  restricted_map (root_map (list_map l)) roots [index].
+  restricted_map (exterior_map (list_map l)) roots [index].
 
 Lemma restricted_roots_map_Znth_diff: forall z roots l j,
   j <> z ->
@@ -1277,13 +1277,13 @@ Lemma restricted_roots_map_Znth_same: forall z roots l j,
     0 <= j < Zlength roots ->
     j = z ->
     Znth j (restricted_roots_map z roots l) =
-    root_map (list_map l) (Znth j roots).
+    exterior_map (list_map l) (Znth j roots).
 Proof.
   intros. unfold restricted_roots_map. subst; simpl. list_solve.
 Qed.
 
 Lemma rrm_non_vertex_id: forall index  (roots: roots_t) l,
-    (forall v, Znth index roots <> RootVertex v) -> 0 <= index < Zlength roots ->
+    (forall v, Znth index roots <> ExteriorVertex v) -> 0 <= index < Zlength roots ->
     restricted_roots_map index roots l = roots.
 Proof.
   intros. apply Znth_list_eq. split.
@@ -1298,7 +1298,7 @@ Proof.
 Qed.
 
 Lemma rrm_not_in_id: forall index (roots: roots_t) l v,
-    Znth index roots = RootVertex v -> ~ In v (map fst l) -> 0 <= index < Zlength roots ->
+    Znth index roots = ExteriorVertex v -> ~ In v (map fst l) -> 0 <= index < Zlength roots ->
     restricted_roots_map index roots l = roots.
 Proof.
   intros. apply Znth_list_eq. split.
@@ -1314,9 +1314,9 @@ Proof.
 Qed.
 
 Lemma rmm_eq_upd_bunch: forall z (roots: roots_t) k v l,
-    Znth z roots = RootVertex k -> In (k, v) l -> 0 <= z < Zlength roots ->
+    Znth z roots = ExteriorVertex k -> In (k, v) l -> 0 <= z < Zlength roots ->
     NoDup (map fst l) ->
-    restricted_roots_map z roots l = upd_Znth z roots (RootVertex v).
+    restricted_roots_map z roots l = upd_Znth z roots (ExteriorVertex v).
 Proof.
   intros. apply Znth_list_eq. split.
   - rewrite restricted_roots_map_Zlength. list_solve.
@@ -1532,8 +1532,8 @@ Definition special_roots_cond (p: forward_p_type) (roots: roots_t) (gen: nat): P
   | ForwardPntVertex _ _ => roots_have_no_gen roots gen
   end.
 
-Lemma root_map_id: root_map id = id.
-Proof. extensionality x. unfold root_map. now destruct x. Qed.
+Lemma exterior_map_id: exterior_map id = id.
+Proof. extensionality x. unfold exterior_map. now destruct x. Qed.
 
 Lemma roots_map_map_cons: forall a l (roots: roots_t),
     DoubleNoDup (a :: l) ->
@@ -1568,7 +1568,7 @@ Proof.
 Qed.
 
 Lemma roots_map_the_same: forall l (roots: roots_t),
-    (forall r, In (RootVertex r) roots -> ~ InEither r l) -> roots_map l roots = roots.
+    (forall r, In (ExteriorVertex r) roots -> ~ InEither r l) -> roots_map l roots = roots.
 Proof.
   do 2 intro. induction roots; intros; simpl; auto. rewrite IHroots.
   - f_equal. destruct a; simpl; auto. assert (~ InEither v l). {
@@ -1580,7 +1580,7 @@ Definition rf_list_relation (roots: roots_t)
            (l: list (VType * VType)) (z: Z) (n: nat): Prop :=
   forall j, 0 <= j < Zlength roots ->
             j = z ->
-            forall v, Znth j roots = RootVertex v -> vgeneration v = n -> In v (map fst l).
+            forall v, Znth j roots = ExteriorVertex v -> vgeneration v = n -> In v (map fst l).
 
 Definition semi_rf_list_relation (roots: roots_t)
            (l: list (VType * VType)) (p: forward_p_type) (n: nat): Prop :=
@@ -1592,13 +1592,13 @@ Definition semi_rf_list_relation (roots: roots_t)
 Lemma inl_rf_list_relation: forall (from : nat) (z : Z) (roots : roots_t)
                                    (l1 : list (VType * VType)),
     0 <= z < Zlength roots ->
-    (forall s, Znth z roots <> RootVertex s) -> rf_list_relation roots l1 z from.
+    (forall s, Znth z roots <> ExteriorVertex s) -> rf_list_relation roots l1 z from.
 Proof. intros. destruct H. red. intros. subst j. exfalso. apply (H0 v). assumption. Qed.
 
 Lemma not_rf_list_relation: forall (from : nat) (z : Z) (roots : roots_t)
                                    (l : list (VType * VType)) v,
     0 <= z < Zlength roots ->
-    Znth z roots = RootVertex v -> vgeneration v <> from ->
+    Znth z roots = ExteriorVertex v -> vgeneration v <> from ->
     rf_list_relation roots l z from.
 Proof.
   intros. destruct H. red. intros. congruence.
@@ -1606,7 +1606,7 @@ Qed.
 
 Lemma roots_map_bijective: forall l,
     DoubleNoDup l -> bijective (roots_map l) (roots_map l).
-Proof. intros. now apply bijective_map, bijective_root_map, bijective_list_bi_map. Qed.
+Proof. intros. now apply bijective_map, bijective_exterior_map, bijective_list_bi_map. Qed.
 
 Lemma fr_O_semi_iso:
   forall (from to : nat) (p : forward_p_type) (g g1 g2 : LGraph)
@@ -1627,7 +1627,7 @@ Proof.
   assert (DoubleNoDup l1) by (eapply semi_iso_DoubleNoDup; eauto).
   assert (bijective (roots_map l1) (roots_map l1)) by (now apply roots_map_bijective).
   destruct p; simpl in H4, H5.
-  - destruct (Znth root_number roots) eqn:? ; simpl in *; rewrite Heqr;
+  - destruct (Znth root_number roots) eqn:Heqr; simpl in *; rewrite Heqr;
       inversion H5; subst; [exists []; simpl..|].
     + split; [|split; [rewrite rrm_non_vertex_id|]]; auto.
       rewrite <- Heqr; apply upd_Znth_unchanged'.
@@ -1650,7 +1650,7 @@ Proof.
         rewrite map_fst_split, Heqp, <- H10. do 2 (split; auto).
         destruct (vvalid_lcm g v (proj1 Hs)); trivial. red in Hg.
         rewrite Forall_forall in Hg. assert (graph_has_v g2 v). {
-          apply Hg; rewrite <- (filter_proj_In_iff root_proj_vertex_spec), <- Heqr;
+          apply Hg; rewrite <- (filter_proj_In_iff exterior_proj_vertex_spec), <- Heqr;
             now apply Znth_In. } destruct H0 as [? _]. red in H0.
         rewrite <- H0 in H15. assert (In v l0) by now rewrite H11. exfalso.
         now apply H13 in H16. } split.
@@ -1658,11 +1658,11 @@ Proof.
         rewrite In_map_fst_iff in H14. destruct H14 as [b ?].
         destruct (H3 _ _ H14) as [? _]. now subst b.
       * red. intros. congruence.
-    + unfold upd_root. rewrite if_true, H11; auto. exists [(v, (new_copied_v g1 to))].
+    + unfold upd_exterior. rewrite if_true, H11; auto. exists [(v, (new_copied_v g1 to))].
       simpl. split3.
       * apply lcv_semi_iso; auto. red in Hg. rewrite Forall_forall in Hg.
         destruct H0. red in H0. rewrite H0. apply Hg.
-        rewrite <- (filter_proj_In_iff root_proj_vertex_spec), <- Heqr. now apply Znth_In.
+        rewrite <- (filter_proj_In_iff exterior_proj_vertex_spec), <- Heqr. now apply Znth_In.
       * erewrite rmm_eq_upd_bunch; eauto. 1: now left. simpl.
         destruct H3 as [_ [_ ?]]. destruct (split l1) as [from_l to_l] eqn: ?.
         destruct H3 as [[? ?] _]. rewrite map_fst_split, Heqp. simpl. constructor.
@@ -1710,7 +1710,7 @@ Proof.
         destruct H13 as [? | [? | ?]]; auto.
         -- now rewrite H13 in Hr.
         -- red in Hg. rewrite Forall_forall in Hg.
-           rewrite (filter_proj_In_iff root_proj_vertex_spec) in H12. apply Hg in H12.
+           rewrite (filter_proj_In_iff exterior_proj_vertex_spec) in H12. apply Hg in H12.
            rewrite <- H13 in H12. unfold new_copied_v in H12. destruct H12.
            simpl in H15. red in H15. lia.
 Qed.
@@ -1722,12 +1722,12 @@ Definition gather_indices (il: list Z) (live_indices: list Z) :=
 
 Definition quasi_roots_map
            (roots: roots_t) (l: list (VType * VType)): roots_t :=
-  map (root_map (list_map l)) roots.
+  map (exterior_map (list_map l)) roots.
 
   (*
 Lemma quasi_roots_map_cons: forall a l roots,
   quasi_roots_map (a :: l) roots =
-  quasi_roots_map l (map (root_map (Z.of_nat a) roots)).
+  quasi_roots_map l (map (exterior_map (Z.of_nat a) roots)).
 Proof.
   intros. reflexivity.
 Qed.
@@ -1737,7 +1737,7 @@ Definition rf_list_pair_relation (roots: roots_t)
            (l1 l2: list (VType * VType)) (z: Z): Prop :=
   forall j, 0 <= j < Zlength roots ->
             j=z ->
-            forall v, Znth j roots = RootVertex v -> In v (map fst (l2 ++ l1)) ->
+            forall v, Znth j roots = ExteriorVertex v -> In v (map fst (l2 ++ l1)) ->
                       In v (map fst l1).
 
                     (*
@@ -1769,9 +1769,9 @@ Proof.
   now destruct H0 as [_ [_ ?]].
 Qed.
 
-Lemma root_map_idempotent: forall f, idempotent f -> idempotent (root_map f).
+Lemma exterior_map_idempotent: forall f, idempotent f -> idempotent (exterior_map f).
 Proof.
-  intros. unfold idempotent in *. intros. unfold root_map. destruct x; auto.
+  intros. unfold idempotent in *. intros. unfold exterior_map. destruct x; auto.
   now rewrite H.
 Qed.
 
@@ -1791,14 +1791,14 @@ Lemma fr_roots_graph_compatible: forall depth from to p g g' roots,
     roots_graph_compatible (upd_roots from to p g roots) g'.
 Proof.
   intros.
-  unfold upd_roots, upd_root in *.
+  unfold upd_roots, upd_exterior in *.
   destruct p.
-  - simpl in *. destruct (Znth root_number roots) eqn: ?; simpl in H2.
+  - simpl in *. destruct (Znth root_number roots) eqn: Heqr; simpl in H2.
     + rewrite <- Heqr. rewrite upd_Znth_unchanged'. inversion H2; subst; assumption.
     + rewrite <- Heqr. rewrite upd_Znth_unchanged'. inversion H2; subst; assumption.
     + assert (graph_has_v g v). {
         red in H4. rewrite Forall_forall in H4. apply H4.
-        rewrite <- (filter_proj_In_iff root_proj_vertex_spec), <- Heqr. apply Znth_In.
+        rewrite <- (filter_proj_In_iff exterior_proj_vertex_spec), <- Heqr. apply Znth_In.
         assumption. }
       inversion H2; destruct (Nat.eq_dec (vgeneration v) from);
         try contradiction; subst; try assumption.
@@ -1809,7 +1809,7 @@ Proof.
       * destruct (raw_mark (vlabel g v)) eqn:? . 1: inversion H9.
         apply lcv_roots_graph_compatible; assumption.
       * destruct (raw_mark (vlabel g v)) eqn:? . 1: inversion H8.
-        remember (upd_Znth root_number roots (RootVertex (new_copied_v g to))) as roots'.
+        remember (upd_Znth root_number roots (ExteriorVertex (new_copied_v g to))) as roots'.
         assert (roots_graph_compatible roots' new_g) by
             (subst; subst new_g; apply lcv_roots_graph_compatible; assumption).
         assert (raw_mark (vlabel new_g (new_copied_v g to)) = false). {
@@ -1833,7 +1833,7 @@ Proof.
         -- intros. subst l. rewrite nat_inc_list_In_iff in H12. assumption.
       * rewrite H8. clear e.
         set (new_g := lgraph_copy_v g v to).
-        remember (upd_Znth root_number roots (RootVertex (new_copied_v g to))) as roots'.
+        remember (upd_Znth root_number roots (ExteriorVertex (new_copied_v g to))) as roots'.
         subst; subst new_g; apply lcv_roots_graph_compatible; assumption.
   - simpl. eapply fr_right_roots_graph_compatible; eauto.
 Qed.
@@ -1884,7 +1884,7 @@ Proof.
     unfold restricted_roots_map in H11. simpl in H11.
     rewrite !upd_Znth0, !Znth_0_cons in H11.
     inv H11. rewrite H15.
-    unfold root_map.
+    unfold exterior_map.
     destruct r; auto.
     f_equal.
     assert (DoubleNoDup (l3 ++ l2 ++ l1)) by (eapply semi_iso_DoubleNoDup; eauto).
@@ -1912,10 +1912,10 @@ Proof.
   intros.
   rewrite Zlength_map in H8.
   rewrite !Znth_map by auto.
-  destruct (Znth i roots1) eqn:? ; simpl; auto. f_equal. apply list_map_bi_map.
+  destruct (Znth i roots1) eqn:Heqr; simpl; auto. f_equal. apply list_map_bi_map.
   intro. eapply semi_iso_In_map_snd in H9; eauto. apply H9. red in H3.
   rewrite Forall_forall in H3. destruct H0. red in H0. rewrite H0. apply H3.
-  rewrite <- (filter_proj_In_iff root_proj_vertex_spec), <- Heqr. apply Znth_In; auto.
+  rewrite <- (filter_proj_In_iff exterior_proj_vertex_spec), <- Heqr. apply Znth_In; auto.
 Qed.
 
 Lemma svfl_semi_iso: forall from to v l l1 g1 g2 g3 roots,
@@ -2019,7 +2019,7 @@ Proof.
    change (?A :: ?B) with ([A]++B) in H6|-*.
    rewrite !roots_graph_compatible_app in *.
    destruct H6 as [? [? ?]].
-   specialize (IHforward_roots_relation H7 H8 H10 (done+:: upd_root from to g1 r)).
+   specialize (IHforward_roots_relation H7 H8 H10 (done+:: upd_exterior from to g1 r)).
    rewrite !roots_graph_compatible_app in *.
    destruct IHforward_roots_relation; auto.
    destruct H11.
@@ -2042,7 +2042,7 @@ Definition marked_in_gen (g1 g2: LGraph) (gen: nat) (v: VType): Prop :=
 
 Definition roots_reachable_in_gen (g: LGraph) (roots: roots_t)
            (gen: nat) (v: VType): Prop :=
-  reachable_through_set g (filter_proj root_proj_vertex roots) v /\ vgeneration v = gen.
+  reachable_through_set g (filter_proj exterior_proj_vertex roots) v /\ vgeneration v = gen.
 
 Definition reachable_iff_marked (g1 g2: LGraph) (roots: roots_t) (gen: nat): Prop :=
   forall v, roots_reachable_in_gen g1 roots gen v <-> marked_in_gen g1 g2 gen v.
@@ -2061,15 +2061,15 @@ Proof.
 Qed.
 
 Lemma reachable_from_roots: forall (g: LGraph) (roots: roots_t) v,
-    reachable_through_set g (filter_proj root_proj_vertex roots) v <->
-    exists i r, 0 <= i < Zlength roots /\ Znth i roots = RootVertex r /\
+    reachable_through_set g (filter_proj exterior_proj_vertex roots) v <->
+    exists i r, 0 <= i < Zlength roots /\ Znth i roots = ExteriorVertex r /\
              reachable g r v.
 Proof.
   intros. unfold reachable_through_set. split; intros.
-  - destruct H as [s [? ?]]. rewrite <- (filter_proj_In_iff root_proj_vertex_spec) in H.
+  - destruct H as [s [? ?]]. rewrite <- (filter_proj_In_iff exterior_proj_vertex_spec) in H.
     apply In_Znth in H. destruct H as [i [? ?]]. exists i, s. split3; auto.
   - destruct H as [i [r [? [? ?]]]]. exists r. split; auto.
-    rewrite <- (filter_proj_In_iff root_proj_vertex_spec), <- H0. now apply Znth_In.
+    rewrite <- (filter_proj_In_iff exterior_proj_vertex_spec), <- H0. now apply Znth_In.
 Qed.
 
 Lemma lcv_copied_vertex: forall (g : LGraph) (v : VType) (to : nat) (x : VType),
@@ -2482,7 +2482,7 @@ Qed.
 Definition backward_edge_prop (g: LGraph) (roots: roots_t) (from to: nat): Prop :=
   forall e: EType, evalid g e -> vgeneration (fst e) = to ->
               vgeneration (dst g e) = from ->
-              reachable_through_set g (filter_proj root_proj_vertex roots) (fst e).
+              reachable_through_set g (filter_proj exterior_proj_vertex roots) (fst e).
 
 Definition edge_from_gen_cond (p : forward_p_type) (gen: nat) :=
   match p with
@@ -2512,9 +2512,9 @@ Proof.
   assert (He: forall e, evalid g1 e -> fst e <> new_copied_v g1 to). {
     intros. destruct H1 as [_ [? _]]. red in H1. rewrite H1 in H8.
     destruct H8. eapply graph_has_v_not_eq in H8; eauto. }
-  unfold upd_roots, upd_root.
+  unfold upd_roots, upd_exterior.
   pose proof H1. destruct H8 as [Hv _]. red in Hv. destruct p; simpl in H4, H5.
-  - destruct (Znth root_number roots) eqn:? ;
+  - destruct (Znth root_number roots) eqn:Heqr;
       simpl in *; rewrite ?Heqr; inversion H5; subst; clear H5;
       try (rewrite <- Heqr, upd_Znth_unchanged'); auto.
     + rewrite if_false; auto. rewrite <- Heqr, upd_Znth_unchanged'; auto.
@@ -2639,7 +2639,7 @@ Qed.
 
 Definition reachable_or_marked (from: nat) (g: LGraph)
            (roots: roots_t) (v: VType): Prop :=
-  vgeneration v = from /\ (reachable_through_set g (filter_proj root_proj_vertex roots) v \/
+  vgeneration v = from /\ (reachable_through_set g (filter_proj exterior_proj_vertex roots) v \/
                             vvalid g v /\ raw_mark (vlabel g v) = true).
 
 Definition reachable_or_marked_special_cond (g: LGraph) (roots: roots_t)
@@ -2662,12 +2662,12 @@ Proof.
   pose (H2 := True).
   intros from to p g1 g2 roots H H0 H1 Hd H3 H4 H5 Hb H6 v.
   assert (Hr: forall i r, 0 <= i < Zlength roots ->
-                     Znth i roots = RootVertex r -> graph_has_v g1 r). {
+                     Znth i roots = ExteriorVertex r -> graph_has_v g1 r). {
       intros. red in H3. rewrite Forall_forall in H3. apply H3.
-      rewrite <- (filter_proj_In_iff root_proj_vertex_spec), <- H8. now apply Znth_In. }
-  unfold upd_roots, upd_root.
+      rewrite <- (filter_proj_In_iff exterior_proj_vertex_spec), <- H8. now apply Znth_In. }
+  unfold upd_roots, upd_exterior.
   pose proof H1. destruct H7 as [Hv _]. red in Hv. destruct p; simpl in H5, H6.
-  - destruct (Znth root_number roots) eqn:? ;
+  - destruct (Znth root_number roots) eqn:Heqr;
       simpl in *; rewrite ?Heqr; inversion H6; subst; clear H6; try easy;
       try (rewrite <- Heqr, upd_Znth_unchanged'); auto; try easy.
     + rewrite if_false; auto; rewrite <- Heqr, upd_Znth_unchanged'; easy.
@@ -2845,7 +2845,7 @@ Proof.
   rewrite !roots_graph_compatible_app in H2'; destruct H2' as [H11 [H2'' H2']].
   assert (H4' := fr_O_copied_vertex_prop from to (ForwardPntRoot 0) g1 g2
                    (r :: roots1) H H1 H0 H3 ltac:(simpl; list_solve) H6 H4).
-  specialize (IH H0' H1' H2' H3' H4' H5' (done +:: upd_root from to g1 r) v).
+  specialize (IH H0' H1' H2' H3' H4' H5' (done +:: upd_exterior from to g1 r) v).
   rewrite <- !app_assoc in IH.
   rewrite <- IH; clear IH.
   2: rewrite roots_graph_compatible_app; split; auto.
@@ -3075,8 +3075,8 @@ Proof.
   specialize (H0 e H1 H2 H3); clear - H H0.
   destruct H0 as [s [? ?]]; exists s; split; auto.
   clear H1.
-  apply (filter_proj_In_iff root_proj_vertex_spec) in H0.
-  apply (filter_proj_In_iff root_proj_vertex_spec).
+  apply (filter_proj_In_iff exterior_proj_vertex_spec) in H0.
+  apply (filter_proj_In_iff exterior_proj_vertex_spec).
   auto.
 Qed.
 
@@ -3107,7 +3107,7 @@ Proof.
  rewrite app_assoc in H9|-*.
  apply IHforward_roots_relation; auto.
  eapply fr_gen_unmarked; try apply H7; auto.
- assert (backward_edge_prop g2 ([upd_root from to g1 r] ++ done ++ roots1) from to). {
+ assert (backward_edge_prop g2 ([upd_exterior from to g1 r] ++ done ++ roots1) from to). {
   pose proof fr_O_backward_edge_prop from to (ForwardPntRoot 0) g1 g2 (r :: done ++ roots1).
   simpl in H12. rewrite upd_Znth0, Znth_0_cons in H12.
   apply H12; auto.
@@ -3140,7 +3140,7 @@ Qed.
 Lemma reachable_or_marked_iff_reachable: forall g roots from v,
     sound_gc_graph g -> graph_unmarked g ->
     reachable_or_marked from g roots v <->
-    reachable_through_set g (filter_proj root_proj_vertex roots) v /\ vgeneration v = from.
+    reachable_through_set g (filter_proj exterior_proj_vertex roots) v /\ vgeneration v = from.
 Proof.
   intros. unfold reachable_or_marked. split; intros; destruct H1; split; auto.
   destruct H2 as [? | [? ?]]; auto. rewrite graph_gen_unmarked_iff in H0.
@@ -3192,7 +3192,7 @@ Lemma frr_dsr_reachable_iff_marked : forall from to roots1 roots2 g1 g2 g3,
     forward_roots_relation from to roots1 g1 roots2 g2 ->
     do_scan_relation from to (number_of_vertices (nth_gen g1 to)) g2 g3 ->
     forall v,
-      reachable_through_set g1 (filter_proj root_proj_vertex roots1) v /\
+      reachable_through_set g1 (filter_proj exterior_proj_vertex roots1) v /\
         vgeneration v = from <->
         raw_mark (vlabel g3 v) = true /\ vvalid g3 v /\ vgeneration v = from.
 Proof.
@@ -3329,7 +3329,7 @@ Proof.
   intros. red in H. destruct (graph_has_gen_dec g1 gen).
   - subst. apply gc_graph_iso_refl.
   - destruct H as [gen_i [? ?]]. subst g2. red. exists id, id, id, id.
-    rewrite root_map_id, map_id. split; easy.
+    rewrite exterior_map_id, map_id. split; easy.
 Qed.
 
 Lemma ngr_firstn_gen_clear: forall g1 g2 gen to,
@@ -3426,25 +3426,25 @@ Proof.
 Qed.
 
 Lemma vvalid_reachable_sub_cons:
-  forall {roots: list root_t} {g : LGraph} {x: VType} (v : VType),
-    vvalid (reachable_sub_labeledgraph g (filter_proj root_proj_vertex roots)) x ->
-    vvalid (reachable_sub_labeledgraph g (v :: filter_proj root_proj_vertex roots)) x.
+  forall {roots: roots_t} {g : LGraph} {x: VType} (v : VType),
+    vvalid (reachable_sub_labeledgraph g (filter_proj exterior_proj_vertex roots)) x ->
+    vvalid (reachable_sub_labeledgraph g (v :: filter_proj exterior_proj_vertex roots)) x.
 Proof.
   intros. simpl in *. unfold predicate_vvalid in *. destruct H.
   rewrite !reachable_through_set_eq. split; [auto | right]. assumption.
 Qed.
 
 Lemma pregraph_iso_cons_vvalid:
-  forall {roots1 roots2 : list root_t} {g1 g2 : LGraph} {v : VType}
+  forall {roots1 roots2 : roots_t} {g1 g2 : LGraph} {v : VType}
     {vmap12 vmap21 : VType -> VType} {emap12 emap21 : EType -> EType},
     pregraph_isomorphism_explicit
-      (reachable_sub_labeledgraph g1 (v :: filter_proj root_proj_vertex roots1))
-      (reachable_sub_labeledgraph g2 (vmap12 v :: filter_proj root_proj_vertex roots2))
+      (reachable_sub_labeledgraph g1 (v :: filter_proj exterior_proj_vertex roots1))
+      (reachable_sub_labeledgraph g2 (vmap12 v :: filter_proj exterior_proj_vertex roots2))
       vmap12 vmap21 emap12 emap21 ->
-    roots2 = map (root_map vmap12) roots1 ->
+    roots2 = map (exterior_map vmap12) roots1 ->
     forall v0 : VType,
-      vvalid (reachable_sub_labeledgraph g1 (filter_proj root_proj_vertex roots1)) v0 ->
-      vvalid (reachable_sub_labeledgraph g2 (filter_proj root_proj_vertex roots2))
+      vvalid (reachable_sub_labeledgraph g1 (filter_proj exterior_proj_vertex roots1)) v0 ->
+      vvalid (reachable_sub_labeledgraph g2 (filter_proj exterior_proj_vertex roots2))
         (vmap12 v0).
 Proof.
   intros roots1 roots2 g1 g2 v vmap12 vmap21 emap12 emap21 lp_pregraph_iso Hrest.
@@ -3456,14 +3456,14 @@ Proof.
   2: (exists s; split; auto). subst s. destruct Hr as [s [Hin Hr]].
   destruct Hr as [p Hr]. destruct p as [v' p]. destruct Hr as [[Hh Hf] [Hvp _]].
   simpl in Hh. subst v'. exists (vmap12 s). split.
-  1: subst roots2; rewrite <- (filter_proj_In_iff root_proj_vertex_spec) in Hin |- * ;
-  rewrite in_map_iff; exists (RootVertex s); split; auto. clear Hr2. destruct Hr1 as [_ Hr1].
+  1: subst roots2; rewrite <- (filter_proj_In_iff exterior_proj_vertex_spec) in Hin |- * ;
+  rewrite in_map_iff; exists (ExteriorVertex s); split; auto. clear Hr2. destruct Hr1 as [_ Hr1].
   generalize dependent v0. induction p using rev_ind; intros.
   - simpl in Hf. subst v0. apply reachable_refl. assumption.
   - assert (valid_path g1 (s, p)) as Hvp1. {
       rewrite valid_path_app in Hvp. destruct Hvp; assumption. }
     pose proof (pfoot_split _ _ _ _ _ Hvp) as Hfs.
-    assert (reachable_through_set g1 (v :: filter_proj root_proj_vertex roots1) (src g1 x))
+    assert (reachable_through_set g1 (v :: filter_proj exterior_proj_vertex roots1) (src g1 x))
       as Hr1s. {
       exists s. split. 1: simpl; right; assumption. exists (s, p). split; split; simpl; auto.
       constructor; auto. simpl. rewrite Forall_forall. intros; auto. }
@@ -3480,25 +3480,25 @@ Proof.
 Qed.
 
 Lemma evalid_reachable_sub_cons:
-  forall {roots: list root_t} {g : LGraph} {e: EType} (v : VType),
-    evalid (reachable_sub_labeledgraph g (filter_proj root_proj_vertex roots)) e ->
-    evalid (reachable_sub_labeledgraph g (v :: filter_proj root_proj_vertex roots)) e.
+  forall {roots: roots_t} {g : LGraph} {e: EType} (v : VType),
+    evalid (reachable_sub_labeledgraph g (filter_proj exterior_proj_vertex roots)) e ->
+    evalid (reachable_sub_labeledgraph g (v :: filter_proj exterior_proj_vertex roots)) e.
 Proof.
   intros. simpl in *. unfold predicate_evalid in *.
   rewrite !reachable_through_set_eq. split; [auto | split; right]; intuition.
 Qed.
 
 Lemma pregraph_iso_cons_evalid:
-  forall (roots1 roots2 : list root_t) (g1 g2 : LGraph) (v : VType)
+  forall (roots1 roots2 : roots_t) (g1 g2 : LGraph) (v : VType)
     (vmap12 vmap21 : VType -> VType) (emap12 emap21 : EType -> EType),
     pregraph_isomorphism_explicit
-      (reachable_sub_labeledgraph g1 (v :: filter_proj root_proj_vertex roots1))
-      (reachable_sub_labeledgraph g2 (vmap12 v :: filter_proj root_proj_vertex roots2))
+      (reachable_sub_labeledgraph g1 (v :: filter_proj exterior_proj_vertex roots1))
+      (reachable_sub_labeledgraph g2 (vmap12 v :: filter_proj exterior_proj_vertex roots2))
       vmap12 vmap21 emap12 emap21 ->
-    roots2 = map (root_map vmap12) roots1 ->
+    roots2 = map (exterior_map vmap12) roots1 ->
     forall e : EType,
-      evalid (reachable_sub_labeledgraph g1 (filter_proj root_proj_vertex roots1)) e ->
-      evalid (reachable_sub_labeledgraph g2 (filter_proj root_proj_vertex roots2))
+      evalid (reachable_sub_labeledgraph g1 (filter_proj exterior_proj_vertex roots1)) e ->
+      evalid (reachable_sub_labeledgraph g2 (filter_proj exterior_proj_vertex roots2))
         (emap12 e).
 Proof.
   intros roots1 roots2 g1 g2 v vmap12 vmap21 emap12 emap21 lp_pregraph_iso Hrest.
@@ -3525,9 +3525,9 @@ Proof.
   - clear - Hrest lp_pregraph_iso.
     assert (v = vmap21 (vmap12 v)) as Hv. {
       destruct lp_pregraph_iso. rewrite surjective; auto. apply bijective_sym. assumption. }
-    assert (roots1 = map (root_map vmap21) roots2) as Hrest'. {
-      eapply map_root_map_bijective; eauto. destruct lp_pregraph_iso. assumption. }
-    rewrite !filter_proj_cons in lp_pregraph_iso. simpl root_proj_vertex in lp_pregraph_iso.
+    assert (roots1 = map (exterior_map vmap21) roots2) as Hrest'. {
+      eapply map_exterior_map_bijective; eauto. destruct lp_pregraph_iso. assumption. }
+    rewrite !filter_proj_cons in lp_pregraph_iso. simpl exterior_proj_vertex in lp_pregraph_iso.
     cbv iota in lp_pregraph_iso. split.
     + destruct lp_pregraph_iso. assumption.
     + destruct lp_pregraph_iso. assumption.

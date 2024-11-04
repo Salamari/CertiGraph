@@ -382,7 +382,7 @@ Proof.
                  Exists i g4 h4.
                  revert H38.
                  replace (update_rootpairs _ _) with rootpairs. 2:{
-                   replace (map (root2val g4) roots) with (map (root2val g) roots).
+                   replace (map (exterior2val g4) roots) with (map (exterior2val g) roots).
                    destruct H as [_ [? _]]; rewrite H. symmetry. apply update_rootpairs_same.
                    destruct H as [_ [? _]]. rewrite H.
                    destruct H30 as [_ [? [[_ ?] _]]]. red in H30. rewrite <- H30.
@@ -393,7 +393,7 @@ Proof.
                    eapply fr_vertex_address; try eassumption.
                    red in H38. rewrite Forall_forall in H38.
                    apply graph_has_v_in_closure. apply H38.
-                   apply (filter_proj_In_iff root_proj_vertex_spec). rewrite <- H43.
+                   apply (filter_proj_In_iff exterior_proj_vertex_spec). rewrite <- H43.
                    apply Znth_In. rewrite Zlength_map in H39. auto. }
                  intros H38.
                  destruct H38 as [? [? [? ?]]].

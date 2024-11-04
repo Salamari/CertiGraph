@@ -995,8 +995,8 @@ Proof.
 Qed.
 
 Lemma roots_outlier_rep_single_rep: forall (roots: roots_t) outlier p,
-    In (RootOutlier p) roots ->
-    incl (filter_proj root_proj_outlier roots) outlier ->
+    In (ExteriorOutlier p) roots ->
+    incl (filter_proj exterior_proj_outlier roots) outlier ->
     outlier_rep outlier |-- single_outlier_rep p * TT.
 Proof. intros. apply outlier_rep_single_rep. eapply root_in_outlier; eauto. Qed.
 
@@ -1018,8 +1018,8 @@ Proof.
 Qed.
 
 Lemma roots_outlier_rep_valid_pointer: forall (roots: roots_t) outlier p,
-    In (RootOutlier p) roots ->
-    incl (filter_proj root_proj_outlier roots) outlier ->
+    In (ExteriorOutlier p) roots ->
+    incl (filter_proj exterior_proj_outlier roots) outlier ->
     outlier_rep outlier |-- valid_pointer (GC_Pointer2val p) * TT.
 Proof. intros. apply outlier_rep_valid_pointer. eapply root_in_outlier; eauto. Qed.
 

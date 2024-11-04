@@ -66,15 +66,15 @@ Ltac inhabited_value T ::= (* remove this when using version of VST
 Lemma root_valid_int_or_ptr: forall g (roots: roots_t) root outlier,
     In root roots ->
     roots_compatible g outlier roots ->
-    graph_rep g * outlier_rep outlier |-- !! (valid_int_or_ptr (root2val g root)).
+    graph_rep g * outlier_rep outlier |-- !! (valid_int_or_ptr (exterior2val g root)).
 Proof.
   intros. destruct H0. destruct root as [? | ? | ?].
-  - simpl root2val. unfold odd_Z2val. replace (2 * z + 1) with (z + z + 1) by lia.
+  - simpl exterior2val. unfold odd_Z2val. replace (2 * z + 1) with (z + z + 1) by lia.
     apply prop_right, valid_int_or_ptr_ii1.
   - sep_apply (roots_outlier_rep_single_rep _ _ _ H H0).
     sep_apply (single_outlier_rep_valid_int_or_ptr g0). entailer!.
   - red in H1. rewrite Forall_forall in H1.
-    rewrite (filter_proj_In_iff root_proj_vertex_spec) in H.
+    rewrite (filter_proj_In_iff exterior_proj_vertex_spec) in H.
     apply H1 in H. simpl. sep_apply (graph_rep_valid_int_or_ptr _ _ H). entailer!.
 Qed.
 

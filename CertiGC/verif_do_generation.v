@@ -7,7 +7,7 @@ Require Import CertiGraph.CertiGC.GCGraph.
 Require Import VST.msl.wand_frame.
 Require Import CertiGraph.CertiGC.env_graph_gc.
 Require Import CertiGraph.CertiGC.spatial_gcgraph.
-Require Import CertiGraph.msl_ext.iter_sepcon. 
+Require Import CertiGraph.msl_ext.iter_sepcon.
 Require Import CertiGraph.CertiGC.gc_spec.
 Require Import CertiGraph.msl_ext.ramification_lemmas.
 Require Import CertiGraph.CertiGC.forward_lemmas.
@@ -35,7 +35,7 @@ Proof.
   assert (Z.of_nat from < MAX_SPACES) by (apply HS; assumption).
   assert (Z.of_nat to < MAX_SPACES) by (apply HS; assumption). clear HS.
   freeze [0;1;2;3] FR.
-  localize [space_struct_rep sh hp h from; 
+  localize [space_struct_rep sh hp h from;
             space_struct_rep sh hp h to].
   unfold space_struct_rep. unfold space_tri.
   forward.
@@ -44,7 +44,7 @@ Proof.
              _ (space_address hp from))
     (data_at sh space_type
              _ (space_address hp to)).
-  replace_SEP 0 (space_struct_rep sh hp h from 
+  replace_SEP 0 (space_struct_rep sh hp h from
                   * space_struct_rep sh hp h to) by
     (unfold space_struct_rep; entailer!!).
   unlocalize [heap_rep sh h hp].
@@ -54,9 +54,9 @@ Proof.
     unfold space_address. Intros.
     entailer!.
   }
-  forward_call. clear H16. 
+  forward_call. clear H16.
     localize [space_struct_rep sh hp h from].
-    unfold space_struct_rep, space_tri. 
+    unfold space_struct_rep, space_tri.
     forward.
     forward.
     replace_SEP 0 (space_struct_rep sh hp h from) by
@@ -68,7 +68,7 @@ Proof.
     remember (WORD_SIZE * used_space (nth_space h to))%Z as to_used.
     remember (WORD_SIZE * total_space (nth_space h to))%Z as to_total.
     remember (WORD_SIZE * used_space (nth_space h from))%Z as from_used.
-    destruct H0 as [? [? ?]]. 
+    destruct H0 as [? [? ?]].
     replace from_p with (gen_start g from) by
         (subst; unfold gen_start; rewrite if_true; assumption).
     replace (offset_val (WORD_SIZE * total_space (nth_space h from))
@@ -87,16 +87,16 @@ Proof.
     forward_call (rsh, sh, gv, g, h, hp, fr, roots, outlier, from, to).
     Intros vret. destruct vret as [[g1 h1] roots1]. simpl fst in *. simpl snd in *.
     freeze [0;1;2;3] FR.
-    set (fr1 := update_frames fr (map (root2val g1) roots1))  in *.
+    set (fr1 := update_frames fr (map (exterior2val g1) roots1))  in *.
     assert (space_start (nth_space h1 from) = gen_start g1 from). {
-      destruct H20 as [? _]. destruct H22 as [_ [? _]]. 
+      destruct H20 as [? _]. destruct H22 as [_ [? _]].
       destruct (gt_gs_compatible _ _ H20 _ H22) as [H24 _]. simpl in H24. rewrite <- H24.
       unfold gen_start. rewrite if_true by assumption. reflexivity. }
     assert (isptr (space_start (nth_space h1 from))). {
       rewrite H24. unfold gen_start. destruct H22 as [_ [? _]].
       rewrite if_true by assumption. apply start_isptr. }
     localize [space_struct_rep sh hp h1 from].
-    unfold space_struct_rep, space_tri. 
+    unfold space_struct_rep, space_tri.
     do 2 forward.
     replace_SEP 0 (space_struct_rep sh hp h1 from) by
         (unfold space_struct_rep, space_tri; entailer!!).
@@ -122,7 +122,7 @@ Proof.
     forward_call (rsh, sh, gv, g1, h1, hp, frames2rootpairs fr1, roots1, outlier,
                   from, to, number_of_vertices (nth_gen g to)).
     Intros vret.
-    destruct vret as [g2 h2]. simpl fst in *. simpl snd in *. 
+    destruct vret as [g2 h2]. simpl fst in *. simpl snd in *.
     sep_apply frames_rep_unlocalize.
     rewrite update_frames_same.
     assert (space_start (nth_space h2 from) = gen_start g2 from). {
@@ -132,7 +132,7 @@ Proof.
       unfold gen_start. rewrite if_true by assumption. reflexivity. }
     assert (isptr (space_start (nth_space h2 from))). {
       rewrite H35. unfold gen_start. destruct H32 as [_ [? _]].
-      rewrite if_true by assumption. apply start_isptr. } 
+      rewrite if_true by assumption. apply start_isptr. }
     freeze [0;1;2;3] FR. localize [space_struct_rep sh hp h2 from].
     unfold space_struct_rep, space_tri.
     forward.
@@ -164,7 +164,7 @@ Proof.
         rewrite H33 in H4.
         clear - H31 H4.
         red in H4. split. lia. rewrite Zlength_correct.
-        lia. 
+        lia.
     }
     Opaque fst. Opaque snd.
     forward; rewrite upd_Znth_same by assumption. entailer!.
@@ -173,11 +173,11 @@ Proof.
     Transparent fst. Transparent snd.
     thaw FR.
     assert (graph_has_gen g2 from) by (destruct H32 as [_ [? _]]; assumption).
-    rewrite (graph_rep_reset g2 from) by assumption. Intros.     
+    rewrite (graph_rep_reset g2 from) by assumption. Intros.
     sep_apply (heap_rest_rep_reset g2 h2 from (proj1 H31) H37).
         rewrite <- heap_struct_rep_eq.
     simpl fst. simpl snd.
-    gather_SEP 0 4. 
+    gather_SEP 0 4.
     replace_SEP 0 (heap_rep sh (reset_nth_heap from h2) hp).
     + unfold heap_rep. entailer!!.
       assert (from < length (spaces h2))%nat by
@@ -189,7 +189,7 @@ Proof.
       2: { apply (frr_not_pointing from to roots g roots1 g1); auto.
            - clear -H0. destruct H0 as [_ [_ [_ [? _]]]]. assumption.
            - clear -H. destruct H as [_ [_ [[_ ?] _]]]. assumption.
-           - apply frr_Zlength_roots in H21; auto. 
+           - apply frr_Zlength_roots in H21; auto.
       }
       remember (reset_nth_heap from h2) as h3.
       remember (reset_graph from g2) as g3.
@@ -198,7 +198,7 @@ Proof.
       assert (heap_relation h h3). {
         apply hr_trans with h2.
         - apply hr_trans with h1; try assumption.
-        - subst h3. apply heaprel_reset. }      
+        - subst h3. apply heaprel_reset. }
       Exists g3 h3 roots1.
       destruct H32 as [? [? [? ?]]].
       replace (update_frames fr (map _ _)) with fr1.
@@ -212,4 +212,3 @@ Proof.
       apply sc_Zlength in H.
       apply frr_Zlength_roots in H21; list_solve.
 Qed.
-

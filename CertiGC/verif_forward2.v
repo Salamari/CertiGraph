@@ -43,7 +43,7 @@ Lemma body_forward_inR:
   (fn_body f_forward)
   (normal_ret_assert
      ((EX (g' : LGraph) (h': heap) (roots' : roots_t),
-     PROP (super_compatible g' h' (update_rootpairs rootpairs (map (root2val g') roots')) roots' outlier;
+     PROP (super_compatible g' h' (update_rootpairs rootpairs (map (exterior2val g') roots')) roots' outlier;
      roots' = upd_roots from to (ForwardPntVertex v n) g roots;
        forward_relation from to (Z.to_nat depth)
          (forward_p2forward_t (ForwardPntVertex v n) roots g) g g';
@@ -51,7 +51,7 @@ Lemma body_forward_inR:
        heap_relation h h')
        RETURN ( ) SEP (all_string_constants rsh gv; outlier_rep outlier;
                   graph_rep g';
-                  roots_rep sh (update_rootpairs rootpairs (map (root2val g') roots'));
+                  roots_rep sh (update_rootpairs rootpairs (map (exterior2val g') roots'));
                   heap_rep sh h' hp))%argsassert
         * stackframe_of f_forward)).
 Proof.
@@ -685,7 +685,7 @@ abbreviate_semax.
                  forward_for_simple_bound
                    n'
                    (EX i: Z, EX g3: LGraph, EX h3: heap,
-                    PROP (super_compatible g3 h3 (update_rootpairs rootpairs (map (root2val g3) roots')) roots' outlier;
+                    PROP (super_compatible g3 h3 (update_rootpairs rootpairs (map (exterior2val g3) roots')) roots' outlier;
                           forward_loop
                             from to (Z.to_nat (depth - 1))
                             (sublist 0 i (vertex_pos_pairs g1 (new_copied_v g to)))
@@ -702,7 +702,7 @@ abbreviate_semax.
                     SEP (all_string_constants rsh gv;
                          outlier_rep outlier;
                          graph_rep g3;
-                         roots_rep sh (update_rootpairs rootpairs (map (root2val g3) roots'));
+                         roots_rep sh (update_rootpairs rootpairs (map (exterior2val g3) roots'));
                          heap_rep sh h3 hp))%assert.
                  +++ pose proof (raw_fields_range2 (vlabel g v')). simpl in H57.
                      now rewrite <- Heqn' in H57.
@@ -721,7 +721,7 @@ abbreviate_semax.
                      assert (graph_has_v g1 (new_copied_v g to)) by
                        (subst g1; rewrite <- lgd_graph_has_v;
                        rewrite Heqg'; apply lcv_graph_has_v_new; assumption).
-                     forward_call (rsh, sh, gv, g3, h3, hp, (update_rootpairs rootpairs (map (root2val g3) roots')), roots',
+                     forward_call (rsh, sh, gv, g3, h3, hp, (update_rootpairs rootpairs (map (exterior2val g3) roots')), roots',
                                     outlier, from, to, depth - 1,
                                     ForwardPntVertex (new_copied_v g to) i).
                      *** apply prop_right. simpl. rewrite sub_repr.
