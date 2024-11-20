@@ -10,12 +10,10 @@ Proof.
   start_function.
   match goal with |- semax _ _ ?c _ => change c with (fn_body f_forward) end.
   change Delta with (func_tycontext f_forward Vprog Gprog nil).
-  destruct forward_p.
-  eapply body_forward_inL; eassumption.
-  eapply body_forward_inR; eassumption.
+  destruct forward_p, fwd_addr; simpl forward_p_address; simpl forward_p_rep.
+  - eapply body_forward_extr; eassumption.
+  - simpl in H2. contradiction.
+  - simpl in H2. contradiction.
+  - gather_SEP (all_string_constants _ _) emp. rewrite sepcon_emp.
+    eapply body_forward_intr; eassumption.
 Qed.
-
-
-
-
-

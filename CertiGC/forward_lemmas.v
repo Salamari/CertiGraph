@@ -63,19 +63,44 @@ Ltac inhabited_value T ::= (* remove this when using version of VST
             end
  end.
 
+Lemma extr_valid_int_or_ptr: forall g (extr: exterior_t) outlier,
+    exterior_compatible g outlier extr ->
+    graph_rep g * outlier_rep outlier |-- !! (valid_int_or_ptr (exterior2val g extr)).
+Proof.
+  intros. destruct extr.
+  - simpl exterior2val. unfold odd_Z2val. replace (2 * z + 1) with (z + z + 1) by lia.
+    apply prop_right, valid_int_or_ptr_ii1.
+  - simpl in H. sep_apply (outlier_rep_single_rep _ _ H).
+    sep_apply (single_outlier_rep_valid_int_or_ptr g0). entailer!.
+  - simpl in H. simpl exterior2val. sep_apply (graph_rep_valid_int_or_ptr _ _ H). entailer!.
+Qed.
+
+Lemma intr_valid_int_or_ptr: forall g outlier from v n,
+    interior_compatible g from (InteriorVertexPos v n) ->
+    outlier_compatible g outlier ->
+    no_dangling_dst g ->
+    graph_rep g * outlier_rep outlier |-- !! (valid_int_or_ptr (Znth n (make_fields_vals g v))).
+Proof.
+  intros g outlier from v n Hfpc Hoc Hnodg. destruct Hfpc as [Hhv [Hn [Hrm [SCAN Hvnf]]]].
+  unfold make_fields_vals. rewrite Hrm, Znth_map; [|rewrite make_fields_eq_length; assumption].
+  destruct (Znth n (make_fields g v)) as [z | gc | e] eqn: Heqf; simpl field2val.
+  - apply prop_right. rewrite if_true by auto. unfold odd_Z2val.
+    replace (2 * z + 1) with (z + z + 1) by lia. apply valid_int_or_ptr_ii1.
+  - eapply in_gcptr_outlier in Hhv; [|eassumption..].
+    sep_apply (outlier_rep_single_rep _ _ Hhv).
+    sep_apply (single_outlier_rep_valid_int_or_ptr gc). entailer !!.
+  - hnf in Hnodg. apply Hnodg with (e := e) in Hhv.
+    + sep_apply (graph_rep_valid_int_or_ptr g (dst g e) Hhv); entailer!!.
+    + rewrite get_edges_In_iff, <- Heqf. now apply Znth_In; rewrite make_fields_eq_length.
+Qed.
+
 Lemma root_valid_int_or_ptr: forall g (roots: roots_t) root outlier,
     In root roots ->
     roots_compatible g outlier roots ->
     graph_rep g * outlier_rep outlier |-- !! (valid_int_or_ptr (exterior2val g root)).
 Proof.
-  intros. destruct H0. destruct root as [? | ? | ?].
-  - simpl exterior2val. unfold odd_Z2val. replace (2 * z + 1) with (z + z + 1) by lia.
-    apply prop_right, valid_int_or_ptr_ii1.
-  - sep_apply (roots_outlier_rep_single_rep _ _ _ H H0).
-    sep_apply (single_outlier_rep_valid_int_or_ptr g0). entailer!.
-  - red in H1. rewrite Forall_forall in H1.
-    rewrite (filter_proj_In_iff exterior_proj_vertex_spec) in H.
-    apply H1 in H. simpl. sep_apply (graph_rep_valid_int_or_ptr _ _ H). entailer!.
+  intros. apply extr_valid_int_or_ptr.
+  rewrite roots_iff_exterior_compatible, Forall_forall in H0. now apply H0.
 Qed.
 
 Lemma weak_derives_strong: forall (P Q: mpred),
@@ -156,4 +181,30 @@ Proof.
   intros. unfold eval_unop. simpl. entailer!.
   unfold field_address. rewrite if_true by assumption. rewrite offset_offset_val.
   simpl. reflexivity.
+Qed.
+
+Lemma graph_heap_outlier_FF: forall g h outlier gen gp,
+    graph_has_gen g gen ->
+    graph_heap_compatible g h ->
+    In gp outlier ->
+    v_in_range (GC_Pointer2val gp) (gen_start g gen) (WORD_SIZE * (gen_size h gen)) ->
+    graph_rep g * heap_rest_rep h * outlier_rep outlier |-- FF.
+Proof.
+  intros. sep_apply (graph_and_heap_rest_data_at_ g h gen). unfold generation_data_at_.
+  sep_apply (outlier_rep_single_rep _ _ H1).
+  pose proof (generation_share_writable (nth_gen g gen)) as Hw.
+  change (generation_sh (nth_gen g gen)) with (nth_sh g gen) in Hw.
+  sep_apply (single_outlier_rep_memory_block_FF gp _ _ _ Hw H2). entailer !!.
+Qed.
+
+Lemma graph_rep_valid_pointer: forall g v,
+    graph_has_v g v -> graph_rep g |-- valid_pointer (vertex_address g v) * TT.
+Proof.
+  intros. sep_apply (graph_rep_vertex_rep _ _ H). Intros sh. unfold vertex_rep, vertex_at.
+  remember (make_fields_vals g v) as l.
+  sep_apply (data_at_valid_ptr sh (tarray int_or_ptr_type (Zlength l)) l (vertex_address g v)).
+  - apply readable_nonidentity, writable_readable_share. assumption.
+  - subst l. simpl. rewrite fields_eq_length.
+    rewrite Z.max_r; pose proof (raw_fields_range (vlabel g v)); lia.
+  - cancel.
 Qed.

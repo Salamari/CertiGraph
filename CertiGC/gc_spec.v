@@ -174,44 +174,42 @@ Qed.
 Definition forward_spec :=
   DECLARE _forward
   WITH rsh: share, sh: share, gv: globals,
-       g: LGraph, h: heap, hp: val, rootpairs: list rootpair,
-       roots : roots_t, outlier: outlier_t,
-       from: nat, to: nat, depth: Z, forward_p: forward_p_type
+       g: LGraph, h: heap, hp: val, outlier: outlier_t,
+       from: nat, to: nat, depth: Z, forward_p: forward_p_type,
+       fwd_addr: forward_addr_type
   PRE [tptr int_or_ptr_type,
        tptr int_or_ptr_type,
        tptr (tptr int_or_ptr_type),
        tptr int_or_ptr_type,
        tint]
     PROP (readable_share rsh; writable_share sh;
-          super_compatible g h rootpairs roots outlier;
-          forward_p_compatible forward_p roots g from;
+          graph_heap_compatible g h;
+          outlier_compatible g outlier;
+          forward_p_compatible forward_p outlier g from;
+          forward_p_addr_match forward_p fwd_addr;
           forward_condition g h from to;
           0 <= depth <= Int.max_signed;
           from <> to)
     PARAMS (gen_start g from;
             limit_address g h from;
             heap_next_address hp to;
-            forward_p_address forward_p rootpairs g;
+            forward_p_address forward_p fwd_addr g;
             Vint (Int.repr depth))
     GLOBALS ()
     SEP (all_string_constants rsh gv;
          outlier_rep outlier;
+         forward_p_rep sh forward_p fwd_addr g;
          graph_rep g;
-         roots_rep sh rootpairs;
          heap_rep sh h hp)
   POST [tvoid]
-    EX g': LGraph, EX h': heap, EX roots': roots_t,
-    PROP (super_compatible g' h' (update_rootpairs rootpairs (map (exterior2val g') roots'))  roots' outlier;
-          roots' = upd_roots from to forward_p g roots;
-          forward_relation from to (Z.to_nat depth)
-                           (forward_p2forward_t forward_p roots g) g g';
-          forward_condition g' h' from to;
-          heap_relation h h')
+    EX g': LGraph, EX h': heap,
+    PROP ((g', h') = forward_graph_and_heap from to (Z.to_nat depth)
+                           (forward_p2forward_t forward_p g) g h)
     RETURN ()
     SEP (all_string_constants rsh gv;
          outlier_rep outlier;
+         forward_p_rep sh (upd_fwd from to g forward_p) fwd_addr g';
          graph_rep g';
-         roots_rep sh (update_rootpairs rootpairs (map (exterior2val g') roots'));
          heap_rep sh h' hp).
 
 Definition forward_roots_spec :=

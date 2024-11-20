@@ -1257,8 +1257,7 @@ Qed.
 
 Definition restricted_roots_map (index: Z)
            (roots: roots_t) (l: list (VType * VType)): roots_t :=
-           (* could avoid restricted_map and just use upd_Znth *)
-  restricted_map (exterior_map (list_map l)) roots [index].
+  upd_Znth index roots (exterior_map (list_map l) (Znth index roots)).
 
 Lemma restricted_roots_map_Znth_diff: forall z roots l j,
   j <> z ->
@@ -1327,12 +1326,14 @@ Proof.
     + rewrite restricted_roots_map_Znth_diff by auto. list_solve.
 Qed.
 
+(*
 Definition semi_roots_map (l1 l2: list (VType * VType))
            (fp: forward_p_type) (roots: roots_t): roots_t :=
   match fp with
   | ForwardPntRoot index => restricted_roots_map index roots l2
   | ForwardPntVertex _ _ => roots_map l2 (roots_map l1 roots)
   end.
+*)
 
 Lemma pcv_is_partial_graph: forall (g: LGraph) old new,
     sound_gc_graph g -> ~ vvalid g new ->
@@ -1470,7 +1471,7 @@ Qed.
 
 Lemma lgd_semi_iso: forall (from to: nat) (g g1: LGraph) l1 v n e,
     from <> to -> sound_gc_graph g -> sound_gc_graph g1 ->
-    graph_has_gen g1 to -> forward_p_compatible (ForwardPntVertex v n) nil g1 from ->
+    graph_has_gen g1 to -> interior_compatible g1 from (InteriorVertexPos v n) ->
     vgeneration (dst g1 e) = from -> Znth n (make_fields g1 v) = FieldEdge e ->
     raw_mark (vlabel g1 (dst g1 e)) = true -> ~ vvalid g v ->
     no_dangling_dst g -> gc_graph_semi_iso g g1 from to l1 ->
@@ -1522,14 +1523,14 @@ Qed.
 
 Definition special_edge_cond (g: LGraph) (p: forward_p_type): Prop :=
   match p with
-  | ForwardPntRoot _ => True
-  | ForwardPntVertex v _ => ~ vvalid g v
+  | FwdPntExtr _ => True
+  | FwdPntIntr (InteriorVertexPos v _) => ~ vvalid g v
   end.
 
 Definition special_roots_cond (p: forward_p_type) (roots: roots_t) (gen: nat): Prop :=
   match p with
-  | ForwardPntRoot _ => True
-  | ForwardPntVertex _ _ => roots_have_no_gen roots gen
+  | FwdPntExtr _ => True
+  | FwdPntIntr _ => roots_have_no_gen roots gen
   end.
 
 Lemma exterior_map_id: exterior_map id = id.
@@ -1582,12 +1583,14 @@ Definition rf_list_relation (roots: roots_t)
             j = z ->
             forall v, Znth j roots = ExteriorVertex v -> vgeneration v = n -> In v (map fst l).
 
+(*
 Definition semi_rf_list_relation (roots: roots_t)
            (l: list (VType * VType)) (p: forward_p_type) (n: nat): Prop :=
   match p with
   | ForwardPntRoot z => rf_list_relation roots l z n
-  | ForwardPntVertex _ _ => True
+  | ForwardPntIntr _ => True
   end.
+ *)
 
 Lemma inl_rf_list_relation: forall (from : nat) (z : Z) (roots : roots_t)
                                    (l1 : list (VType * VType)),
@@ -1600,27 +1603,24 @@ Lemma not_rf_list_relation: forall (from : nat) (z : Z) (roots : roots_t)
     0 <= z < Zlength roots ->
     Znth z roots = ExteriorVertex v -> vgeneration v <> from ->
     rf_list_relation roots l z from.
-Proof.
-  intros. destruct H. red. intros. congruence.
-Qed.
+Proof. intros. destruct H. red. intros. congruence. Qed.
 
 Lemma roots_map_bijective: forall l,
     DoubleNoDup l -> bijective (roots_map l) (roots_map l).
 Proof. intros. now apply bijective_map, bijective_exterior_map, bijective_list_bi_map. Qed.
 
 Lemma fr_O_semi_iso:
-  forall (from to : nat) (p : forward_p_type) (g g1 g2 : LGraph)
-         (roots : roots_t) l1,
+  forall (from to : nat) (p : forward_p_type) (g g1 g2 : LGraph) (outlier : outlier_t) l1,
     from <> to -> sound_gc_graph g -> sound_gc_graph g1 -> graph_has_gen g1 to ->
-    roots_graph_compatible roots g1 ->
-    gc_graph_semi_iso g g1 from to l1 -> forward_p_compatible p roots g1 from ->
+    (* roots_graph_compatible roots g1 -> *)
+    gc_graph_semi_iso g g1 from to l1 -> forward_p_compatible p outlier g1 from ->
     no_dangling_dst g -> no_dangling_dst g1 -> special_edge_cond g p ->
-    special_roots_cond p roots from ->
-    forward_relation from to O (forward_p2forward_t p roots g1) g1 g2 ->
-    exists l2, gc_graph_semi_iso g g2 from to (l2 ++ l1) /\
-               upd_roots from to p g1 roots =
-               semi_roots_map l1 (l2 ++ l1) p roots /\
-               semi_rf_list_relation roots (l2 ++ l1) p from.
+    (* special_roots_cond p roots from -> *)
+    forward_relation from to O (forward_p2forward_t p g1) g1 g2 ->
+    exists l2, gc_graph_semi_iso g g2 from to (l2 ++ l1).
+               (* upd_roots from to p g1 roots = *)
+               (* semi_roots_map l1 (l2 ++ l1) p roots /\ *)
+               (* semi_rf_list_relation roots (l2 ++ l1) p from. *)
 Proof.
   pose (H2:=True).
   intros from to p g g1 g2 roots l1 H Hs H0 H1 Hg H3 H4 H7 Hd Hp Hr H5.

@@ -2071,10 +2071,37 @@ Definition heap_next_address (hp: val) (to: nat) :=
     [StructField _next; ArraySubsc (Z.of_nat to); StructField _spaces]
     hp.
 
-Definition forward_p_address (p: forward_p_type) (rootpairs: list rootpair) (g: LGraph) :=
+Definition interior_address (intr: interior_t) (g: LGraph) : val :=
+  match intr with
+  | InteriorVertexPos v n => offset_val (WORD_SIZE * n) (vertex_address g v)
+  end.
+
+Definition forward_addr_type: Type := option val.
+
+Definition forward_p_addr_match (p: forward_p_type) (addr: forward_addr_type): Prop :=
+  match p, addr with
+  | FwdPntExtr _, Some _ => True
+  | FwdPntIntr _, None => True
+  | _, _ => False
+  end.
+
+Definition forward_p_address (p: forward_p_type) (addr: forward_addr_type)
+  (g: LGraph): val :=
   match p with
-  | ForwardPntRoot root_index => rp_adr (Znth root_index rootpairs)
-  | ForwardPntVertex v n => offset_val (WORD_SIZE * n) (vertex_address g v)
+  | FwdPntIntr intr => interior_address intr g
+  | FwdPntExtr _ => match addr with
+                   | Some v => v
+                   | None => default
+                   end
+  end.
+
+Definition forward_p_rep (sh: share) (p: forward_p_type) (addr: forward_addr_type) (g: LGraph) :=
+  match p with
+  | FwdPntIntr _ => emp
+  | FwdPntExtr extr => match addr with
+                      | Some v => data_at sh int_or_ptr_type (exterior2val g extr) v
+                      | None => emp
+                      end
   end.
 
 Lemma frames_rep_ptr_or_null: forall sh frames,
