@@ -6978,3 +6978,10 @@ Proof.
   rewrite vpp_Zlength in H. rewrite vpp_Znth by assumption.
   eapply forward_gh_loop_add_tail with (g2 := g2); eassumption.
 Qed.
+
+Lemma gen_range: forall g h gen,
+    graph_heap_compatible g h -> graph_has_gen g gen -> 0 <= Z.of_nat gen < MAX_SPACES.
+Proof.
+  intros g h gen Hghc Hgen. destruct Hghc as [_ [_ ?]]. red in Hgen.
+  pose proof spaces_size h as Hsp. rewrite Zlength_correct in Hsp. lia.
+Qed.

@@ -28,10 +28,7 @@ Proof.
   assert (isptr (space_start (nth_space h to))) by
       (rewrite <- H9; apply start_isptr).
   assert (HS: forall gen, graph_has_gen g gen -> Z.of_nat gen < MAX_SPACES). {
-    intros. unfold graph_has_gen in H14. destruct H as [[_ [_ ?]] _].
-    rewrite <- (spaces_size h). rewrite Zlength_correct.
-    apply inj_lt. apply Nat.lt_le_trans with
-                      (Datatypes.length (g_gen (glabel g))); assumption. }
+    intros. eapply gen_range; eassumption. }
   assert (Z.of_nat from < MAX_SPACES) by (apply HS; assumption).
   assert (Z.of_nat to < MAX_SPACES) by (apply HS; assumption). clear HS.
   freeze [0;1;2;3] FR.

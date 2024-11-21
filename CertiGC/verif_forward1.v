@@ -152,18 +152,15 @@ Proof.
           rewrite Hrm. entailer !!. }
         unlocalize [graph_rep g]. 1: now apply (graph_vertex_ramif_stable _ _ Hfpc). thaw FR.
         forward. simpl forward_p2forward_t. Exists g h.
-        rewrite fwd_graph_heap_unfold, Hvv, Hrm. destruct (Nat.eq_dec _ _); [|contradiction].
-        entailer !!. simpl upd_fwd. destruct (Nat.eq_dec _ _); [|contradiction].
+        rewrite fwd_graph_heap_unfold, Hvv, Hrm. rewrite if_true by reflexivity.
+        entailer !!. simpl upd_fwd. rewrite if_true by reflexivity.
         rewrite Hrm. simpl forward_p_rep. unfold heap_rep. cancel.
       * forward. thaw FR. freeze [0; 1; 2; 3; 4] FR.
         try apply Int64_eq_false in H0. rename H0 into Hrm.
         pose proof make_header_int_rep_mark_iff g ev as Hiff. simpl in Hiff.
         rewrite Hiff in Hrm. clear Hiff. apply not_true_is_false in Hrm.
         rewrite make_header_Wosize by assumption.
-        assert (Htrange: 0 <= Z.of_nat to < MAX_SPACES). {
-          clear -Hghc Hto. destruct Hghc as [_ [_ ?]]. red in Hto.
-          pose proof spaces_size h. rewrite Zlength_correct in H0. rep_lia. }
-        unfold heap_struct_rep.
+        pose proof gen_range _ _ _ Hghc Hto as Htrange. unfold heap_struct_rep.
         destruct (gt_gs_compatible _ _ Hghc _ Hto) as [Has [Hgen Hpre]].
         rewrite nth_space_Znth in *.
         remember (Znth (Z.of_nat to) (spaces h)) as sp_to.
@@ -355,13 +352,11 @@ Proof.
            forward_call nv. remember (cut_heap h (Z.of_nat to) (vertex_size g ev)) as h'.
            forward. drop_LOCAL 10%nat. do 2 drop_LOCAL 0%nat. rewrite Hnveq in Hcvsame.
            assert (H': (g', h') = forward_graph_and_heap from to 0 (ForwardVertex ev) g h). {
-             simpl. destruct (Nat.eq_dec _ _); try contradiction. rewrite Hrm.
-             subst g' h'. reflexivity. }
+             simpl. rewrite if_true by assumption. rewrite Hrm. subst g' h'. reflexivity. }
            forward_if.
            2: { forward. Exists g' h'. assert (depth = 0) by lia. subst depth.
                 simpl forward_p2forward_t. entailer !!. simpl upd_fwd.
-                destruct (Nat.eq_dec _ _); try contradiction. rewrite Hrm. simpl.
-                entailer !!. }
+                rewrite if_true by reflexivity. rewrite Hrm. simpl. entailer !!. }
            rename H0 into Hdepg. forward_if.
            ++ pose proof raw_tag_lt_noscan _ _ Hrm H0 as SCAN'. clear H0.
               replace fp with (gen_start g' from) by
@@ -467,22 +462,19 @@ Proof.
               ** Intros g3 h3. rename H0 into Hgh3. rewrite sublist_same in Hgh3; auto.
                  2: { subst n g' from. rewrite vpp_Zlength, lcv_vlabel_new; auto. }
                  simpl forward_p2forward_t. Exists g3 h3. simpl upd_fwd.
-                 destruct (Nat.eq_dec _ _); [|contradiction]. rewrite Hrm.
+                 rewrite if_true by assumption. rewrite Hrm.
                  simpl forward_p_rep. entailer !!.
                  replace (Z.to_nat depth) with (S (Z.to_nat (depth - 1))) by
                    (rewrite <- Z2Nat.inj_succ; [f_equal|]; lia). simpl.
-                 destruct (Nat.eq_dec _ _); [|contradiction]. rewrite Hrm.
-                 destruct (Z_lt_ge_dec _ _); [|contradiction]. assumption.
+                 rewrite if_true by reflexivity. rewrite Hrm, if_true; assumption.
            ++ pose proof raw_tag_ge_noscan _ _ Hrm H0 as SCAN'. clear H0.
-              forward. Exists g' h'. simpl upd_fwd.
-              destruct (Nat.eq_dec _ _); [|contradiction]. rewrite Hrm.
-              simpl forward_p_rep. entailer !!.
+              forward. Exists g' h'. simpl upd_fwd. rewrite if_true by assumption.
+              rewrite Hrm. simpl forward_p_rep. entailer !!.
               replace (Z.to_nat depth) with (S (Z.to_nat (depth-1))) by (clear - Hdepg; lia).
-              simpl. destruct (Nat.eq_dec _ _); [|contradiction]. rewrite Hrm.
-              destruct (Z_lt_ge_dec _ _); [contradiction|]. reflexivity.
+              simpl. rewrite if_true by reflexivity. rewrite Hrm.
+              rewrite if_false by assumption. reflexivity.
     + forward_if. 1: contradiction. rewrite Hviff in Hvv. forward.
         Exists g h. entailer !!; simpl.
-        * rewrite fwd_graph_heap_unfold. destruct (Nat.eq_dec _ _); [contradiction | easy].
-        * unfold heap_rep. destruct (Nat.eq_dec _ _); [contradiction | ].
-           simpl exterior2val. entailer !!.
+        * rewrite fwd_graph_heap_unfold. rewrite if_false; easy.
+        * unfold heap_rep. rewrite if_false by assumption. simpl exterior2val. entailer !!.
 Qed.

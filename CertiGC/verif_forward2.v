@@ -12,7 +12,8 @@ Require Import CertiGraph.CertiGC.gc_spec.
 Require Import CertiGraph.msl_ext.ramification_lemmas.
 Require Import CertiGraph.CertiGC.forward_lemmas.
 
-Local Opaque Int64.repr.
+#[local] Opaque Int64.repr.
+#[local] Opaque lgraph_copy_v.
 
 Local Open Scope logic.
 
@@ -74,7 +75,7 @@ Proof.
     (unfold vertex_rep, vertex_at; entailer !!).
   unlocalize [graph_rep g]. 1: apply graph_vertex_ramif_stable; assumption. thaw FR.
   gather_SEP (graph_rep _) (outlier_rep _).
-  sep_apply (intr_valid_int_or_ptr g outlier from  v n). 1: red; easy. Intros.
+  sep_apply (intr_valid_int_or_ptr g outlier from v n). 1: red; easy. Intros.
   rename H into Hvintr. remember (Znth n (make_fields_vals g v)) as vn.
   unfold make_fields_vals in Heqvn.
   rewrite Hrm, Znth_map in Heqvn; [|rewrite make_fields_eq_length; assumption].
@@ -200,16 +201,13 @@ Proof.
         try (rewrite make_fields_eq_length); assumption.
         Exists (labeledgraph_gen_dst g e (copied_vertex (vlabel g (dst g e)))) h.
         simpl forward_p2forward_t. rewrite Heqf. simpl field2forward. simpl forward_p_rep.
-        rewrite fwd_graph_heap_unfold. subst v'. destruct (Nat.eq_dec _ _); [|contradiction].
+        rewrite fwd_graph_heap_unfold. subst v'. rewrite if_true by assumption.
         rewrite Hrm'. thaw FR. unfold heap_rep. entailer !!.
       * (* not yet forwarded *)
         forward. thaw FR. freeze [0; 1; 2; 3] FR. rename H0 into Hrm'.
         rewrite Hiff in Hrm'. clear Hiff. apply not_true_is_false in Hrm'.
         rewrite make_header_Wosize by assumption.
-        assert (Htrange: 0 <= Z.of_nat to < MAX_SPACES). {
-          clear -Hghc Hto. destruct Hghc as [_ [_ Hl]]. red in Hto.
-          pose proof spaces_size h as Hs. rewrite Zlength_correct in Hs. rep_lia. }
-        unfold heap_struct_rep.
+        pose proof gen_range _ _ _ Hghc Hto as Htrange. unfold heap_struct_rep.
         destruct (gt_gs_compatible _ _ Hghc _ Hto) as [Has [Hgen Hpre]].
         rewrite nth_space_Znth in *. remember (Znth (Z.of_nat to) (spaces h)) as sp_to.
         assert (Hss: isptr (space_start sp_to)) by (rewrite <- Has; apply start_isptr).
@@ -439,7 +437,7 @@ Proof.
              (unfold heap_rep; simpl heap_head; entailer!).
            rewrite Hnveq in Hcvsame.
            assert (H': (gg, h') = forward_graph_and_heap from to 0 (ForwardEdge e) g h). {
-             simpl. rewrite <- Heqv'. destruct (Nat.eq_dec _ _); [| contradiction].
+             simpl. rewrite <- Heqv'. rewrite if_true by assumption.
              rewrite Hrm'. subst gg h' g' ncv. reflexivity. }
            forward_if.
            ++ rename H0 into Hdepg. forward_if.
@@ -511,7 +509,7 @@ Proof.
                             eapply fl_outlier_compatible. 7: apply Hfl.
                             all: try eassumption.
                             apply Forall_sublist, vertex_pos_pairs_in_range.
-                        *** simpl. subst ncv. Opaque lgraph_copy_v.
+                        *** simpl. subst ncv.
                             split; [|split; [|split; [|split]]].
                             ---- eapply fl_graph_has_v with (g := gg); eassumption.
                             ---- erewrite <- fl_raw_fields; eauto. subst n' gg g' from.
@@ -548,20 +546,18 @@ Proof.
                     Exists g3 h3. simpl forward_p_rep. entailer !!.
                  replace (Z.to_nat depth) with (S (Z.to_nat (depth - 1))) by
                    (rewrite <- Z2Nat.inj_succ; [f_equal|]; lia). simpl.
-                 destruct (Nat.eq_dec _ _); [|contradiction]. rewrite Hrm'.
-                 destruct (Z_lt_ge_dec _ _); [|contradiction]. assumption.
+                 rewrite if_true by reflexivity. rewrite Hrm', if_true; assumption.
               ** pose proof raw_tag_ge_noscan _ _ Hrm' H0 as SCAN'. clear H0.
                  forward. Exists gg h'. simpl forward_p2forward_t. rewrite Heqf.
                  simpl field2forward. simpl forward_p_rep. entailer !!.
                  replace (Z.to_nat depth) with (S (Z.to_nat (depth-1))) by
-                   (clear - Hdepg; lia). simpl. destruct (Nat.eq_dec _ _); [|contradiction].
-                 rewrite Hrm'. destruct (Z_lt_ge_dec _ _); [contradiction|]. reflexivity.
+                   (clear - Hdepg; lia). simpl. rewrite if_true by reflexivity.
+                 rewrite Hrm'. rewrite if_false; [reflexivity | assumption].
            ++ forward. Exists gg h'. assert (depth = 0) by lia. subst depth. clear H0.
               simpl forward_p2forward_t. rewrite Heqf. simpl field2forward.
               simpl forward_p_rep. entailer !!.
     + forward_if. 1: contradiction. rewrite Hviff in Hvv.
       forward. Exists g h. entailer !!.
-      * simpl. rewrite Heqf. simpl. rewrite fwd_graph_heap_unfold.
-        destruct (Nat.eq_dec _ _); [contradiction | easy].
+      * simpl. rewrite Heqf. simpl. rewrite fwd_graph_heap_unfold, if_false; easy.
       * unfold heap_rep. entailer !!.
 Qed.

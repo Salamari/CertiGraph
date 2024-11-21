@@ -263,15 +263,15 @@ Definition forward_remset_spec :=
 Definition do_scan_spec :=
   DECLARE _do_scan
   WITH rsh: share, sh: share, gv: globals,
-       g: LGraph, h: heap, hp: val, rootpairs: list rootpair,
-       roots : roots_t, outlier: outlier_t,
+       g: LGraph, h: heap, hp: val, outlier: outlier_t,
        from: nat, to: nat, to_index: nat
   PRE [tptr int_or_ptr_type,
        tptr int_or_ptr_type,
        tptr int_or_ptr_type,
        tptr (tptr int_or_ptr_type)]
     PROP (readable_share rsh; writable_share sh;
-          super_compatible g h rootpairs roots outlier;
+          graph_heap_compatible g h;
+          outlier_compatible g outlier;
           forward_condition g h from to;
           from <> to; closure_has_index g to to_index;
           0 < gen_size h to; gen_unmarked g to)
@@ -283,11 +283,11 @@ Definition do_scan_spec :=
     SEP (all_string_constants rsh gv;
          outlier_rep outlier;
          graph_rep g;
-         roots_rep sh rootpairs;
          heap_rep sh h hp)
   POST [tvoid]
     EX g': LGraph, EX h': heap,
-    PROP (super_compatible g' h' rootpairs roots outlier;
+    PROP (graph_heap_compatible g' h';
+          outlier_compatible g' outlier;
           forward_condition g' h' from to;
           do_scan_relation from to to_index g g';
           heap_relation h h')
@@ -295,7 +295,6 @@ Definition do_scan_spec :=
     SEP (all_string_constants rsh gv;
          outlier_rep outlier;
          graph_rep g';
-         roots_rep sh rootpairs;
          heap_rep sh h' hp).
 
 Definition do_generation_spec :=
