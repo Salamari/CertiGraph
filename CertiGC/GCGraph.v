@@ -7035,3 +7035,70 @@ Proof.
   - destruct v; auto. list_solve.
   - destruct a. destruct v as [|v rest]; simpl; auto. f_equal. apply IHrp; list_solve.
 Qed.
+
+Lemma fr_O_rootpairs_compatible_unchanged: forall g g' from to rootpairs roots intr,
+    graph_has_gen g to ->
+    roots_graph_compatible roots g ->
+    rootpairs_compatible g rootpairs roots ->
+    forward_relation from to O (interior2forward intr g) g g' ->
+    rootpairs_compatible g' rootpairs roots.
+Proof.
+  intros g g' from to rootpairs roots intr Hghg Hrgc Hrc Hfr.
+  destruct intr eqn: Heqr; simpl in *. inversion Hfr; subst g'; subst; auto.
+  - apply lcv_rootpairs_compatible_unchanged; assumption.
+  - subst new_g.
+    apply lgd_fun_thread_arg_compatible, lcv_rootpairs_compatible_unchanged; auto.
+Qed.
+
+Lemma svfl_roots_graph_compatible: forall from to v roots l g1 g2,
+    graph_has_gen g1 to ->
+    roots_graph_compatible roots g1 ->
+    scan_vertex_for_loop from to v l g1 g2 ->
+    roots_graph_compatible roots g2.
+Proof.
+  intros from to v roots l. induction l; intros g1 g2 Hghg Hrgc Hsvfl.
+  - inversion Hsvfl; subst; auto.
+  - inversion Hsvfl; subst; clear Hsvfl. eapply IHl with (g1 := g3); eauto.
+    + rewrite <- fr_graph_has_gen; eassumption.
+    + eapply fr_roots_graph_compatible; eassumption.
+Qed.
+
+Lemma do_scan_rootpairs_compatible: forall from to idx g1 g2 rootpairs roots,
+    graph_has_gen g1 to ->
+    roots_graph_compatible roots g1 ->
+    rootpairs_compatible g1 rootpairs roots ->
+    do_scan_relation from to idx g1 g2 ->
+    rootpairs_compatible g2 rootpairs roots.
+Proof.
+  intros from to idx g1 g2 rootpairs roots Hghg Hrgc Hrc Hdsr.
+  destruct Hdsr as [n [Hsvwl Hno]]. remember (seq _ _). clear Heql Hno n.
+  revert g1 g2 Hghg Hrgc Hrc Hsvwl. induction l; intros.
+  - inversion Hsvwl. subst. auto.
+  - inversion Hsvwl; subst; clear Hsvwl.
+    + eapply IHl; eauto.
+    + eapply IHl with (g1 := g3); eauto.
+      * rewrite <- svfl_graph_has_gen; eauto.
+      * eapply svfl_roots_graph_compatible; eassumption.
+      * clear dependent g2. clear l H1 H2 IHl. remember (nat_inc_list _). remember (to, a).
+        clear Heql Heqp. revert g1 g3 H3 Hghg Hrgc Hrc. induction l; intros.
+        -- inversion H3; subst; auto.
+        -- inversion H3; subst; clear H3. eapply IHl; eauto.
+           ++ rewrite <- fr_graph_has_gen; eauto.
+           ++ eapply fr_roots_graph_compatible; eauto.
+           ++ eapply fr_O_rootpairs_compatible_unchanged; eauto.
+Qed.
+
+Lemma do_scan_roots_compatible: forall from to idx g1 g2 outlier roots,
+    graph_has_gen g1 to ->
+    roots_compatible g1 outlier roots ->
+    do_scan_relation from to idx g1 g2 ->
+    roots_compatible g2 outlier roots.
+Proof.
+  intros from to idx g1 g2 outlier roots Hghg [Hroc Hrgc] Hdsr. split; auto.
+  clear dependent outlier. destruct Hdsr as [n [Hsvwl Hno]]. remember (seq _ _).
+  clear Heql Hno n. revert g1 g2 Hghg Hrgc Hsvwl.
+  induction l; intros;  inversion Hsvwl; subst; clear Hsvwl; auto. 1: eapply IHl; eauto.
+  eapply IHl with (g1 := g3); eauto.
+  - rewrite <- svfl_graph_has_gen; eassumption.
+  - eapply svfl_roots_graph_compatible; eassumption.
+Qed.

@@ -116,10 +116,15 @@ Proof.
     assert (0 < gen_size h1 to) by (rewrite <- (proj1 H23); assumption).
     assert (gen_unmarked g1 to) by (eapply (frr_gen_unmarked _ _ _ g _ g1); eauto).
     sep_apply frames_rep_localize. Intros.
-    forward_call (rsh, sh, gv, g1, h1, hp, frames2rootpairs fr1, roots1, outlier,
-                  from, to, number_of_vertices (nth_gen g to)).
-    Intros vret.
-    destruct vret as [g2 h2]. simpl fst in *. simpl snd in *.
+    forward_call (rsh, sh, gv, g1, h1, hp, outlier,
+                   from, to, number_of_vertices (nth_gen g to)).
+    1: destruct H20 as [? [? [? ?]]]; split; assumption.
+    Intros vret. destruct vret as [g2 h2]. simpl fst in *. simpl snd in *.
+    assert (Hsp: super_compatible g2 h2 (frames2rootpairs fr1) roots1 outlier). {
+      destruct H20 as [? [? [Hrc ?]]]. split; [|split; [|split]]; auto.
+      - destruct Hrc. eapply do_scan_rootpairs_compatible; eassumption.
+      - eapply do_scan_roots_compatible; eassumption. } clear H31 H32. rename Hsp into H31.
+    rename H33 into H32. rename H34 into H33. rename H35 into H34.
     sep_apply frames_rep_unlocalize.
     rewrite update_frames_same.
     assert (space_start (nth_space h2 from) = gen_start g2 from). {
@@ -186,7 +191,6 @@ Proof.
       2: { apply (frr_not_pointing from to roots g roots1 g1); auto.
            - clear -H0. destruct H0 as [_ [_ [_ [? _]]]]. assumption.
            - clear -H. destruct H as [_ [_ [[_ ?] _]]]. assumption.
-           - apply frr_Zlength_roots in H21; auto.
       }
       remember (reset_nth_heap from h2) as h3.
       remember (reset_graph from g2) as g3.
