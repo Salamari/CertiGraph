@@ -307,14 +307,21 @@ Proof.
   + set (rp'' := frames2rootpairs (update_frames _ _)).
     Intros.
     assert (LENroots'': Zlength roots'' = nr k + i)
-       by (apply frr_Zlength in H11; list_solve).
-    forward_call (rsh,sh,gv,g'',h'',hp,rp'',roots''++oldroots k i,outlier,from,to,0,
-                   ForwardPntRoot (nr k+i)).
-    * entailer!!.
-      simpl. f_equal. f_equal. f_equal. f_equal.
-      subst rp''.
-      apply frr_Zlength in H11.
-      clear - H11 H7 H2 H5 H3 H10 H' Hnr Hi Hfrs' LENfrs'.
+      by (apply frr_Zlength in H11; list_solve).
+    assert (Hrof: Zlength (roots'' ++ oldroots k i) = Zlength (frames2rootpairs frs)). {
+      subst oldroots. simpl.
+      rewrite Zlength_app, LENroots'', H', Zlength_sublist; list_solve. }
+    assert (Hghv: forall v, ExteriorVertex v = Znth (nr k + i) (roots'' ++ oldroots k i) ->
+                       graph_has_v g'' v). {
+      intros. destruct H13 as [Hghc [Hrpc [[Hroc Hrgc] Hoc]]]. hnf in Hrgc.
+      rewrite Forall_forall in Hrgc. apply Hrgc.
+      rewrite <- (filter_proj_In_iff exterior_proj_vertex_spec), H15.
+      apply Znth_In. list_solve. }
+    forward_call (rsh, sh, gv, g'', h'', hp, outlier,
+                   from, to, 0, FwdPntExtr (Znth (nr k+i) (roots''++oldroots k i)),
+                   Some (rp_adr (Znth (nr k+i) rp''))).
+    * entailer !!. simpl. do 4 f_equal. subst rp''.
+      apply frr_Zlength in H11. clear - H11 H7 H2 H5 H3 H10 H' Hnr Hi Hfrs' LENfrs'.
       unfold oldroots.
       replace r with (fr_root (Znth k frs')) by (rewrite H7; reflexivity).
       set (r3 := map (exterior2val g'') (roots'' ++ sublist (nr k + i) (Zlength roots) roots)).
@@ -407,80 +414,66 @@ Proof.
           f_equal.
           f_equal.
           lia.
-    * split.
-     -- rewrite update_rootpairs_frames2rootpairs in H13; auto.
-        apply frr_Zlength in H11. rewrite Zlength_map, Zlength_app, <- H11.
-        rewrite  <- H', <- Hfrs', Zlength_map.
-        apply frr_Zlength in H3.
-        rewrite Zlength_app, <- H3.
-        cut (0 <= nr k /\ nr k <= nr k + i <= Zlength roots); [intro |].
-        rewrite (sublist_split 0 (nr k) (nr k + i)) by lia.
-        rewrite Zlength_app.
-        rewrite !Zlength_sublist by list_solve.
-        subst oldroots; cbv beta in *.
-        list_solve.
-        subst nr; cbv beta in *.
-        split. rep_lia.
-        split. lia.
-        rewrite H'.
-        rewrite <- (sublist_same 0 (Zlength frs) frs) at 2 by auto.
-        rewrite (sublist_split 0 k (Zlength frs)) by lia.
-        rewrite frames2rootpairs_app.
-        rewrite Zlength_app.
-        apply Z.add_le_mono. lia.
-        rewrite (sublist_split k (k+1)) by list_solve.
-        rewrite frames2rootpairs_app, Zlength_app.
-        rewrite sublist_len_1 by list_solve.
-        unfold frames2rootpairs at 1. simpl concat.
-        unfold frame2rootpairs.
-        rewrite app_nil_r.
-        rewrite Zlength_frame2rootpairs'.
-        rep_lia.
-     -- red. split. lia.
-        apply frr_Zlength in H11.
-        rewrite Zlength_app, <- H11.
-        unfold oldroots.
-        rewrite <- Zlength_app.
-        rewrite sublist_rejoin; try list_solve.
-    * Intros vret.
-      destruct vret as [[g3 h3] roots3].
-      simpl fst in *. simpl snd in *.
+    * simpl forward_p_rep. unfold roots_rep. destruct H13 as [Hghc [Hrpc [Hrc Hoc]]].
+      red in Hrpc. assert (Zlength (roots'' ++ oldroots k i) = Zlength rp''). {
+        subst rp''. rewrite <- update_rootpairs_frames2rootpairs.
+        - rewrite Zlength_update_rootpairs; [|rewrite Zlength_map; symmetry]; assumption.
+        - rewrite Zlength_map. assumption. }
+      rewrite (sepcon_isolate_nth _ _ (nr k + i)) by list_solve.
+      subst rp''. rewrite update_rootpairs_frames2rootpairs in Hrpc by list_solve.
+      remember (frames2rootpairs (update_frames _ _)) as rp''.
+      rewrite <- (Znth_map _ (exterior2val g'')) by list_solve. rewrite Hrpc.
+      rewrite Znth_map by list_solve. cancel.
+    * rewrite update_rootpairs_frames2rootpairs in H13 by list_solve.
+      destruct H13 as [Hghc [Hrpc [Hrc Hoc]]]. split; [|split]; auto. hnf.
+      remember (Znth (nr k + i) _) as extr. destruct Hrc as [Hroc Hrgc].
+      destruct extr as [z | p | v]; auto.
+      eapply root_in_outlier; eauto. rewrite Heqextr. apply Znth_In. list_solve.
+    * Intros vret. destruct vret as [g3 h3]. simpl forward_p_rep.
+      simpl fst in *. simpl snd in *. simpl forward_p2forward_t in H15.
+      remember (Znth (nr k + i) (roots'' ++ oldroots k i)) as extr.
+      remember (upd_roots from to (nr k + i) g'' (roots'' ++ oldroots k i)) as roots3.
+      rename Heqroots3 into H16. simpl Z.to_nat in H15.
+      pose proof fr_forward_graph_and_heap from to O (exterior2forward extr) g'' h''.
+      rewrite <- H15 in H17. simpl fst in H17.
+      assert (forward_condition g3 h3 from to). {
+        eapply forward_graph_and_heap_fc; [assumption | | eassumption..].
+        destruct extr as [z | p | v]; simpl; auto. }
+      assert (heap_relation h'' h3). {
+        pose proof heaprel_forward_graph_and_heap from to O (exterior2forward extr) g'' h''.
+        rewrite <- H15 in H19. simpl snd in H19. apply H19. }
       Exists g3 h3 (sublist 0 (nr k + (i+1)) roots3).
-      entailer!!.
-      --
-        split3; [ | | split3].
-        ++  rewrite (sublist_split 0 (nr k + i)) by list_solve.
-            unfold upd_roots.
-            rewrite upd_Znth_app2 by list_solve.
-            rewrite Znth_app2 by list_solve.
-            rewrite LENroots''. rewrite Z.sub_diag.
-            change (Z.to_nat 0) with O in H17.
-            rewrite (sublist_one (nr k + i)) by list_solve.
-            rewrite (sublist_split 0 (nr k + i) (nr k + (i+1)))
-              by (unfold oldroots; list_solve).
-            rewrite sublist_app1 by list_solve. rewrite sublist_app2 by list_solve.
-            rewrite LENroots'', Z.sub_diag.
-            rewrite (sublist_same _ _ roots'') by list_solve.
-            eapply frr_app; [ eassumption | ].
-            replace (_ - _) with 1 by lia.
-            unfold oldroots.
-            rewrite sublist_upd_Znth_lr by list_solve. rewrite Z.sub_diag.
-            rewrite sublist_sublist by list_solve.
-            rewrite sublist_one by list_solve.
-            autorewrite with sublist.
-            rewrite upd_Znth0.
-            econstructor; [  | econstructor].
-            replace (exterior2forward (Znth (nr k + i) roots))
-              with  (forward_p2forward_t (ForwardPntRoot (nr k + i))
-                       (roots'' ++ oldroots k i) g''); auto.
-            simpl. rewrite Znth_app2 by list_solve. rewrite LENroots'', Z.sub_diag.
-            unfold oldroots. f_equal. list_solve.
+      entailer !!.
+      -- split; [|split; [|split; [|split]]].
+        ++ rewrite (sublist_split 0 (nr k + i)) by list_solve.
+           unfold upd_roots.
+           rewrite upd_Znth_app2 by list_solve.
+           rewrite Znth_app2 by list_solve.
+           rewrite LENroots''. rewrite Z.sub_diag.
+           change (Z.to_nat 0) with O in H17.
+           rewrite (sublist_one (nr k + i)) by list_solve.
+           rewrite (sublist_split 0 (nr k + i) (nr k + (i+1)))
+             by (unfold oldroots; list_solve).
+           rewrite sublist_app1 by list_solve. rewrite sublist_app2 by list_solve.
+           rewrite LENroots'', Z.sub_diag.
+           rewrite (sublist_same _ _ roots'') by list_solve.
+           eapply frr_app; [ eassumption | ].
+           replace (_ - _) with 1 by lia.
+           unfold oldroots.
+           rewrite sublist_upd_Znth_lr by list_solve. rewrite Z.sub_diag.
+           rewrite sublist_sublist by list_solve.
+           rewrite sublist_one by list_solve.
+           autorewrite with sublist.
+           rewrite upd_Znth0.
+           econstructor; [  | econstructor].
+           replace (Znth (nr k + i) roots)
+             with  (Znth (nr k + i) (roots'' ++ oldroots k i)); auto.
+           rewrite Znth_app2 by list_solve. rewrite LENroots'', Z.sub_diag.
+           unfold oldroots. list_solve.
         ++ eapply hr_trans; try eassumption.
-        ++ match type of H15 with super_compatible g3 h3 ?RP ?R outlier =>
-            match goal with |- super_compatible g3 h3 ?RP' ?R' outlier =>
-                         replace RP' with RP; [ replace R' with R | ]; auto
-           end end.
-           ** unfold upd_roots, oldroots.
+        ++ remember (sublist 0 _ _ ++ _).
+           assert (l = upd_roots from to (nr k + i) g'' (roots'' ++ oldroots k i)). {
+             subst l. unfold upd_roots, oldroots.
            rewrite !upd_Znth_app2 by list_solve. rewrite LENroots'', Z.sub_diag.
            rewrite (sublist_split 0 (nr k + i) (nr k + (i+1)))  by list_solve.
            rewrite sublist_app1 by list_solve.
@@ -493,96 +486,97 @@ Proof.
            rewrite (sublist_split (nr k + i) (nr k + (i+1)) (Zlength roots))  by list_solve.
            rewrite (sublist_one (nr k + i) (nr k + (i+1))) by list_solve.
            rewrite upd_Znth_app1 by list_solve.
-           list_solve.
-           ** subst rp''.
-             {
-              rewrite !update_rootpairs_frames2rootpairs, update_update_frames.
-              - f_equal. f_equal. f_equal.
-                unfold oldroots. simpl. rewrite !upd_Znth_app2 by list_solve.
-                rewrite (sublist_split 0 (nr k + i) (nr k + (i + 1))) by list_solve.
-                rewrite LENroots'', Z.sub_diag.
-                rewrite (sublist_app1 _ 0 (nr k + i)) by list_solve.
-                rewrite <- app_assoc.
-                rewrite (sublist_same 0 (nr k + i)) by list_solve.
-                f_equal.
-                rewrite sublist_app2 by list_solve.
-                rewrite LENroots'', Z.sub_diag.
-                ring_simplify (nr k + (i + 1) - (nr k + i)).
-                rewrite (sublist_one 0 1) by list_solve.
-                rewrite upd_Znth_same by list_solve.
-                rewrite (sublist_split (nr k + i) (nr k + (i+1)) (Zlength roots)) by list_solve.
-                rewrite (sublist_one (nr k + i)) by list_solve.
-                rewrite upd_Znth_app1 by list_solve.
-                rewrite upd_Znth0.
-                rewrite Znth_app2 by list_solve. rewrite LENroots'', Z.sub_diag.
-                rewrite Znth_app1 by list_solve.
-                rewrite Znth_0_cons.
-                f_equal.
-              - unfold oldroots. list_solve.
-              - autorewrite with sublist.
-                simpl. list_solve.
-              - simpl. rewrite !Zlength_map.
-                rewrite upd_Znth_app2 by list_solve.
-                unfold oldroots.
-                rewrite (sublist_split 0 (nr k + i) (nr k + (i + 1))) by list_solve.
-                rewrite LENroots'', Z.sub_diag.
-                rewrite (sublist_app1 _ 0 (nr k + i)) by list_solve.
-                rewrite <- app_assoc.
-                rewrite (sublist_same 0 (nr k + i)) by list_solve.
-                list_solve.
-              - unfold upd_roots. unfold oldroots.
-                rewrite !Zlength_map.
-                rewrite <- update_rootpairs_frames2rootpairs by list_solve.
-                rewrite Zlength_update_rootpairs by list_solve.
-                list_solve.
-             }
+           list_solve. }
+           assert (update_rootpairs (frames2rootpairs frs) (map (exterior2val g3) l) =
+                     update_rootpairs rp'' (map (exterior2val g3) l)). {
+             rewrite H16. subst rp''.
+             rewrite !update_rootpairs_frames2rootpairs, update_update_frames.
+             - f_equal.
+             - unfold oldroots. list_solve.
+             - unfold upd_roots. list_solve.
+             - rewrite <- update_rootpairs_frames2rootpairs by list_solve.
+               rewrite Zlength_update_rootpairs by list_solve.
+               unfold upd_roots. list_solve.
+             - unfold upd_roots. list_solve. } rewrite H20. rewrite H16. clear dependent l.
+           destruct H13 as [? [? [? ?]]]. destruct H14 as [? [? [? [? ?]]]].
+           assert (forward_t_compatible
+                     (exterior2forward (Znth (nr k + i) (roots'' ++ oldroots k i))) g''). {
+             destruct (Znth (nr k + i) (roots'' ++ oldroots k i)); simpl; auto. }
+           split; [|split; [|split]].
+           ** eapply forward_graph_and_heap_O_ghc; eassumption.
+           ** subst rp''. remember (roots'' ++ oldroots k i).
+              rewrite <- update_rootpairs_frames2rootpairs by list_solve.
+              remember (update_rootpairs (frames2rootpairs frs) (map (exterior2val g'') l)).
+              eapply fr_O_rootpairs_compatible; eauto. destruct H20. assumption.
+           ** eapply fr_roots_compatible; [list_solve | eassumption..].
+           ** eapply fr_outlier_compatible; eassumption.
         ++ symmetry; eapply fr_gen_start; eauto.
             destruct H0 as [_ [_ [? _]]].
             erewrite <- frr_graph_has_gen; eauto.
         ++ unfold limit_address.
-          destruct H19; rewrite H16.
-          f_equal.
-          symmetry; eapply fr_gen_start with (x:=from); try eassumption.
-          destruct H0 as [_ [_ [? _]]].
-          eapply frr_graph_has_gen with (gen:=to) in H11; eauto.
-          rewrite <- H11; auto.
-      -- apply derives_refl'; f_equal.
-         unfold rp''.
-         rewrite update_rootpairs_frames2rootpairs.
-         f_equal.
-         rewrite update_update_frames.
-         f_equal. f_equal. simpl.
-         rewrite upd_Znth_app2 by list_solve.
-         rewrite LENroots'', Z.sub_diag.
-         rewrite Znth_app2 by list_solve.
-         rewrite LENroots'', Z.sub_diag.
-         unfold oldroots.
-         rewrite (sublist_split 0 (nr k + i) (nr k + (i + 1))) by list_solve.
-         rewrite (sublist_app1 _ 0 (nr k + i)) by list_solve.
-         rewrite <- app_assoc.
-         rewrite (sublist_same 0 (nr k + i)) by list_solve.
-         f_equal.
-         rewrite (sublist_split (nr k + i) (nr k + (i+1)) (Zlength roots)) by list_solve.
-         rewrite (sublist_one (nr k + i)) by list_solve.
-         rewrite upd_Znth_app1 by list_solve.
-         rewrite upd_Znth0.
-         rewrite Znth_app1 by list_solve.
-         rewrite Znth_0_cons.
-         rewrite sublist_app2 by list_solve.
-         rewrite LENroots'', Z.sub_diag.
-         rewrite (sublist_one 0) by list_solve.
-         rewrite Znth_app1 by list_solve.
-         rewrite Znth_0_cons.
-         f_equal.
-         unfold oldroots. list_solve.
-         autorewrite with sublist.
-         unfold oldroots; simpl. list_solve.
-         unfold oldroots.
-         apply sc_Zlength in H.
-         rewrite <- update_rootpairs_frames2rootpairs by list_solve.
-         unfold upd_roots.
-         rewrite Zlength_update_rootpairs by list_solve.
-         list_solve.
+           destruct H19; rewrite H16.
+           f_equal.
+           symmetry; eapply fr_gen_start with (x:=from); try eassumption.
+           destruct H0 as [_ [_ [? _]]].
+           eapply frr_graph_has_gen with (gen:=to) in H11; eauto.
+           rewrite <- H11; auto.
+      -- apply derives_trans with
+           (Q := roots_rep sh
+                   (update_rootpairs rp''
+                      (map (exterior2val g3)
+                         (upd_roots from to (nr k + i) g'' (roots'' ++ oldroots k i))))).
+         ++ unfold upd_roots. rewrite <- upd_Znth_map.
+            assert (map (exterior2val g3) (roots'' ++ oldroots k i) = map rp_val rp''). {
+              subst rp''. rewrite <- update_rootpairs_frames2rootpairs by list_solve.
+              rewrite map_rpval_update_rootpairs by list_solve. rewrite map_ext_in_iff.
+              intros. destruct a0; simpl; auto. erewrite <- fr_vertex_address; eauto.
+              - destruct H14 as [? [? [? ?]]]. assumption.
+              - apply graph_has_v_in_closure.
+                destruct H13 as [Hghc [Hrpc [[Hroc Hrgc] Hoc]]]. hnf in Hrgc.
+                rewrite Forall_forall in Hrgc. apply Hrgc.
+                rewrite <- (filter_proj_In_iff exterior_proj_vertex_spec). assumption. }
+            rewrite H16. rewrite update_rootpairs_upd_Znth.
+            rewrite upd_Znth_unfold by list_solve. unfold roots_rep.
+            rewrite !iter_sepcon_app_sepcon. change (Z.succ (nr k + i)) with (nr k + i + 1).
+            simpl. entailer !!.
+         ++ apply derives_refl'; f_equal.
+            unfold rp''.
+            rewrite update_rootpairs_frames2rootpairs.
+            ** f_equal.
+               rewrite update_update_frames.
+               f_equal. f_equal. unfold upd_roots. simpl.
+               rewrite upd_Znth_app2 by list_solve.
+               rewrite LENroots'', Z.sub_diag.
+               rewrite Znth_app2 by list_solve.
+               rewrite LENroots'', Z.sub_diag.
+               unfold oldroots.
+               rewrite (sublist_split 0 (nr k + i) (nr k + (i + 1))) by list_solve.
+               rewrite (sublist_app1 _ 0 (nr k + i)) by list_solve.
+               rewrite <- app_assoc.
+               rewrite (sublist_same 0 (nr k + i)) by list_solve.
+               f_equal.
+               rewrite (sublist_split (nr k + i) (nr k + (i+1)) (Zlength roots))
+                 by list_solve.
+               rewrite (sublist_one (nr k + i)) by list_solve.
+               rewrite upd_Znth_app1 by list_solve.
+               rewrite upd_Znth0.
+               rewrite Znth_app1 by list_solve.
+               rewrite Znth_0_cons.
+               rewrite sublist_app2 by list_solve.
+               rewrite LENroots'', Z.sub_diag.
+               rewrite (sublist_one 0) by list_solve.
+               rewrite Znth_app1 by list_solve.
+               rewrite Znth_0_cons.
+               f_equal.
+               unfold oldroots. list_solve.
+               autorewrite with sublist.
+               unfold oldroots; simpl. unfold upd_roots. list_solve.
+            ** unfold oldroots.
+               apply sc_Zlength in H.
+               rewrite <- update_rootpairs_frames2rootpairs by list_solve.
+               unfold upd_roots.
+               rewrite Zlength_update_rootpairs by list_solve.
+               list_solve.
   + Intros g3 h3 roots3. Exists (k+1, g3, h3, roots3 ). simpl fst; simpl snd.
     assert (oldroots (k+1) 0 = oldroots k (Zlength s)). {
        unfold oldroots. f_equal. unfold nr.
