@@ -752,6 +752,13 @@ Definition exterior_compatible (g: LGraph) (outlier: outlier_t) (extr: exterior_
   | _ => True
   end.
 
+(* A weaker version which does not require outlier *)
+Definition exterior_compatible' (g: LGraph) (extr: exterior_t) : Prop :=
+  match extr with
+  | ExteriorVertex v => graph_has_v g v
+  | _ => True
+  end.
+
 Lemma roots_iff_exterior_compatible: forall g outlier roots,
     roots_compatible g outlier roots <-> Forall (exterior_compatible g outlier) roots.
 Proof.
@@ -1771,6 +1778,13 @@ Definition forward_p_compatible
   (p: forward_p_type) (outlier: outlier_t) (g: LGraph) (from: nat): Prop :=
   match p with
   | FwdPntExtr extr => exterior_compatible g outlier extr
+  | FwdPntIntr intr => interior_compatible g from intr
+  end.
+
+(* A weaker version which does not require outlier *)
+Definition forward_p_compatible' (p: forward_p_type) (g: LGraph) (from: nat): Prop :=
+  match p with
+  | FwdPntExtr extr => exterior_compatible' g extr
   | FwdPntIntr intr => interior_compatible g from intr
   end.
 
@@ -4441,6 +4455,13 @@ Proof.
   destruct r; simpl; try tauto. rewrite Forall_cons_iff. tauto.
 Qed.
 
+Lemma rgc_cons_vertex: forall v roots g,
+    roots_graph_compatible (ExteriorVertex v :: roots) g -> graph_has_v g v.
+Proof.
+  intros v roots g. unfold roots_graph_compatible. rewrite filter_proj_cons. simpl.
+  rewrite Forall_cons_iff. tauto.
+Qed.
+
 Lemma frr_not_pointing: forall from to roots1 g1 roots2 g2,
     copy_compatible g1 -> roots_graph_compatible roots1 g1 -> from <> to ->
     graph_has_gen g1 to ->
@@ -5226,8 +5247,8 @@ Proof.
     * apply lcv_no_dangling_dst; [assumption..|]. destruct H. apply (H3 _ H _ H2).
 Qed.
 
-Lemma fr_O_no_dangling_dst': forall from to p g g' outlier,
-    forward_p_compatible p outlier g from ->
+Lemma fr_O_no_dangling_dst': forall from to p g g',
+    forward_p_compatible' p g from ->
     graph_has_gen g to ->
     copy_compatible g ->
     forward_relation from to O (forward_p2forward_t p g) g g' ->
@@ -5276,7 +5297,7 @@ Proof.
     + erewrite <- fr_raw_tag; eauto.
     + eapply (fr_copy_compatible _ _ _ _ g1); eauto.
     + eapply (fr_O_no_dangling_dst' from to
-                (FwdPntIntr (InteriorVertexPos v (Z.of_nat a))) g1 _ []); eauto. simpl.
+                (FwdPntIntr (InteriorVertexPos v (Z.of_nat a))) g1); eauto. simpl.
       intuition auto with *. rewrite Zlength_correct. apply inj_lt. apply H5. now left.
     + apply NoDup_cons_1 in H6; assumption.
 Qed.
@@ -5342,7 +5363,7 @@ Proof.
     + erewrite <- fr_graph_has_gen; eauto.
     + intros. erewrite <- fr_raw_fields; eauto. apply H7. right; assumption.
   - apply (fr_O_no_dangling_dst' from to
-             (FwdPntIntr (InteriorVertexPos v (Z.of_nat a))) g1 _ []); auto.
+             (FwdPntIntr (InteriorVertexPos v (Z.of_nat a))) g1); auto.
     simpl. intuition auto with *. rewrite Zlength_correct. apply inj_lt. apply H7. now left.
 Qed.
 
