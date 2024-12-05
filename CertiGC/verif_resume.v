@@ -10,7 +10,7 @@ Proof.
   rewrite !ptrofs_to_int64_repr by auto.
   pose proof Ptrofs.unsigned_range.
   unfold Ptrofs.max_unsigned in H0.
-  unfold Ptrofs.modulus, Ptrofs.wordsize, 
+  unfold Ptrofs.modulus, Ptrofs.wordsize,
     Wordsize_Ptrofs.wordsize in H0. rewrite H in H0.
   change (two_power_nat 64) with (Int64.max_unsigned + 1) in H0.
   rewrite !Int64.unsigned_repr.
@@ -30,7 +30,7 @@ Proof.
   rewrite !ptrofs_to_int_repr by auto.
   pose proof Ptrofs.unsigned_range.
   unfold Ptrofs.max_unsigned in H0.
-  unfold Ptrofs.modulus, Ptrofs.wordsize, 
+  unfold Ptrofs.modulus, Ptrofs.wordsize,
     Wordsize_Ptrofs.wordsize in H0. rewrite H in H0.
   change (two_power_nat 32) with (Int.max_unsigned + 1) in H0.
   rewrite !Int.unsigned_repr.
@@ -58,7 +58,7 @@ Proof.
     do 2 forward; try solve [entailer!!].
     rewrite Znth_0_cons.
     destruct (space_start (heap_head (ti_heap t_info))) eqn:? ; try contradiction.
-    forward_if (Ptrofs.unsigned (ti_nalloc t_info) <= total_space hs).
+    forward_if (Ptrofs.unsigned (ti_nalloc t_info) <= available_space hs).
     + unfold denote_tc_samebase. simpl. entailer!!.
     + unfold all_string_constants; Intros; forward_call; contradiction.
     + forward. entailer!!.
@@ -73,14 +73,14 @@ Proof.
       unfold Ptrofs.divs in H7.
       first [rewrite (Ptrofs.signed_repr 8) in H7 by rep_lia |
              rewrite (Ptrofs.signed_repr 4) in H7 by rep_lia].
-      rewrite Ptrofs.signed_repr in H7 by (pose proof (total_space_signed_range h); lia).
+      rewrite Ptrofs.signed_repr in H7 by (pose proof (available_space_signed_range h); lia).
       unfold WORD_SIZE in H7. rewrite Z.mul_comm, Z.quot_mul in H7 by lia.
       unfold Ptrofs.ltu in H7.
       rewrite !Ptrofs.unsigned_repr in H7
-        by (first [apply total_space_range | apply word_size_range]).
+        by (first [apply available_space_range | apply word_size_range]).
       if_tac in H7; try discriminate; clear H7.
       rewrite Ptrofs.repr_unsigned in H.
-      pose proof total_space_range h.
+      pose proof available_space_range h.
       destruct Archi.ptr64 eqn:Hx; try discriminate Hx; clear Hx.
       lia.
     + rewrite <- Heqv in H6|-*. red in H0. rewrite H0 in H5.
@@ -91,9 +91,9 @@ Proof.
              sh ((space_start (heap_head (ti_heap t_info)),
                   (offset_val (WORD_SIZE * used_space (heap_head (ti_heap t_info)))
                               (space_start (heap_head (ti_heap t_info))),
-                   (offset_val (WORD_SIZE * total_space (heap_head (ti_heap t_info)))
+                   (offset_val (WORD_SIZE * available_space (heap_head (ti_heap t_info)))
                               (space_start (heap_head (ti_heap t_info))),
-                    offset_val (WORD_SIZE * total_space (heap_head (ti_heap t_info)))
+                    offset_val (WORD_SIZE * available_space (heap_head (ti_heap t_info)))
                               (space_start (heap_head (ti_heap t_info))))))
                    :: map space_tri hl) (ti_heap_p t_info))
          by (unfold heap_struct_rep; entailer!!).

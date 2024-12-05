@@ -246,10 +246,10 @@ Record space: Type :=
   {
     space_start: val;
     used_space: Z;
-    total_space: Z;
+    available_space: Z;
     space_sh: share;
-    space_order: 0 <= used_space <= total_space;
-    space_upper_bound: total_space <= MAX_SPACE_SIZE;
+    space_order: 0 <= used_space <= available_space;
+    space_upper_bound: available_space <= MAX_SPACE_SIZE;
   }.
 
 Definition null_space: space.
@@ -261,37 +261,37 @@ Defined.
 
 #[export] Instance space_inhabitant: Inhabitant space := null_space.
 
-Lemma total_space_tight_range: forall sp, 0 <= total_space sp <= MAX_SPACE_SIZE.
+Lemma available_space_tight_range: forall sp, 0 <= available_space sp <= MAX_SPACE_SIZE.
 Proof.
   intros. split.
   - destruct (space_order sp). transitivity (used_space sp); assumption.
   - apply space_upper_bound.
 Qed.
 
-Lemma total_space_range: forall sp, 0 <= total_space sp <= (if Archi.ptr64 then Int64.max_unsigned else Int.max_unsigned).
+Lemma available_space_range: forall sp, 0 <= available_space sp <= (if Archi.ptr64 then Int64.max_unsigned else Int.max_unsigned).
 Proof. intros. apply MSS_max_unsigned_range.
- pose proof (total_space_tight_range sp). lia.
+ pose proof (available_space_tight_range sp). lia.
 Qed.
 
-Lemma total_space_signed_range: forall sp,
-    Ptrofs.min_signed <= WORD_SIZE * total_space sp < Ptrofs.max_signed.
-Proof. intros. apply MSS_max_wordsize_signed_range. apply total_space_tight_range. Qed.
+Lemma available_space_signed_range: forall sp,
+    Ptrofs.min_signed <= WORD_SIZE * available_space sp < Ptrofs.max_signed.
+Proof. intros. apply MSS_max_wordsize_signed_range. apply available_space_tight_range. Qed.
 
 Lemma used_space_signed_range: forall sp,
     Ptrofs.min_signed <= WORD_SIZE * used_space sp < Ptrofs.max_signed.
 Proof.
   intros. apply MSS_max_wordsize_signed_range. destruct (space_order sp). split.
-  1: assumption. apply Z.le_trans with (total_space sp). 1: assumption.
-  apply (proj2 (total_space_tight_range sp)).
+  1: assumption. apply Z.le_trans with (available_space sp). 1: assumption.
+  apply (proj2 (available_space_tight_range sp)).
 Qed.
 
 Lemma rest_space_signed_range: forall sp,
     Ptrofs.min_signed <=
-    WORD_SIZE * total_space sp - WORD_SIZE * used_space sp <
+    WORD_SIZE * available_space sp - WORD_SIZE * used_space sp <
     Ptrofs.max_signed.
 Proof.
   intros. rewrite <- Z.mul_sub_distr_l. apply MSS_max_wordsize_signed_range.
-  destruct (space_order sp). pose proof (total_space_tight_range sp). lia.
+  destruct (space_order sp). pose proof (available_space_tight_range sp). lia.
 Qed.
 
 Definition range_signed (z: Z) :=
@@ -317,14 +317,14 @@ Proof.
   pose proof (used_space_signed_range sp). unfold WORD_SIZE in H. rep_lia.
 Qed.
 
-Lemma total_space_repable_signed: forall sp, range_signed (total_space sp).
+Lemma available_space_repable_signed: forall sp, range_signed (available_space sp).
 Proof.
   intros. rewrite <- signed_range_repable_signed.
-  pose proof (total_space_signed_range sp). unfold WORD_SIZE in H. rep_lia.
+  pose proof (available_space_signed_range sp). unfold WORD_SIZE in H. rep_lia.
 Qed.
 
 Lemma rest_space_repable_signed: forall sp,
-    range_signed (total_space sp - used_space sp).
+    range_signed (available_space sp - used_space sp).
 Proof.
   intros. rewrite <- signed_range_repable_signed.
   pose proof (rest_space_signed_range sp). unfold WORD_SIZE in H. rep_lia.
@@ -875,11 +875,11 @@ Qed.
 Definition reset_nth_graph_info (n: nat) (g: graph_info) : graph_info :=
   Build_graph_info (reset_nth_gen_info n g.(g_gen)) (reset_nth_gen_info_not_nil n g).
 
-Lemma reset_space_order: forall sp, (0 <= 0 <= total_space sp)%Z.
+Lemma reset_space_order: forall sp, (0 <= 0 <= available_space sp)%Z.
 Proof. intros. pose proof (space_order sp). lia. Qed.
 
 Definition reset_space (sp: space) : space :=
-  Build_space (space_start sp) 0 (total_space sp) (space_sh sp) (reset_space_order sp)
+  Build_space (space_start sp) 0 (available_space sp) (space_sh sp) (reset_space_order sp)
               (space_upper_bound sp).
 
 Fixpoint reset_nth_space (n: nat) (s: list space): list space :=
@@ -1520,24 +1520,24 @@ Definition vertex_pos_pairs (g: LGraph) (v: VType) : list interior_t :=
     (nat_inc_list (length (raw_fields (vlabel g v)))).
 
 Definition has_space (sp: space) (s: Z): Prop :=
-  0 <= s <= total_space sp - used_space sp.
+  0 <= s <= available_space sp - used_space sp.
 
 Lemma has_space_dec: forall sp s, {has_space sp s} + {~ has_space sp s}.
 Proof.
   intros. unfold has_space. destruct (Z_le_dec 0 s).
-  - destruct (Z_le_dec s (total_space sp - used_space sp)).
+  - destruct (Z_le_dec s (available_space sp - used_space sp)).
     + left. split; assumption.
     + right. lia.
   - right. lia.
 Qed.
 
 Lemma cut_space_order: forall (sp : space) (s : Z),
-    has_space sp s -> 0 <= used_space sp + s <= total_space sp.
+    has_space sp s -> 0 <= used_space sp + s <= available_space sp.
 Proof. intros. pose proof (space_order sp). red in H. lia. Qed.
 
 Definition cut_space (sp: space) (s: Z): space :=
   match has_space_dec sp s with
-  | left H => Build_space (space_start sp) (used_space sp + s) (total_space sp)
+  | left H => Build_space (space_start sp) (used_space sp + s) (available_space sp)
                (space_sh sp) (cut_space_order sp s H) (space_upper_bound sp)
   | right _ => sp
   end.
@@ -1916,7 +1916,7 @@ Proof.
   rewrite Nat2Z.id. reflexivity.
 Qed.
 
-Definition gen_size t_info n := total_space (nth_space t_info n).
+Definition gen_size t_info n := available_space (nth_space t_info n).
 
 Lemma gsc_iff: forall (g: LGraph) h,
     length (g_gen (glabel g)) <= length (spaces h) ->
@@ -1998,7 +1998,7 @@ Local Open Scope Z_scope.
 
 Definition forward_roots_compatible
            (from to: nat) (g: LGraph) (h: heap): Prop :=
-  (nth_space h from).(used_space) <= (nth_space h to).(total_space) - (nth_space h to).(used_space).
+  (nth_space h from).(used_space) <= (nth_space h to).(available_space) - (nth_space h to).(used_space).
 
 Lemma vo_lt_gs: forall g v,
     gen_has_index g (vgeneration v) (vindex v) ->
@@ -2087,7 +2087,7 @@ Proof.
 Qed.
 
 Definition rest_gen_size (h: heap) (gen: nat): Z :=
-  total_space (nth_space h gen) - used_space (nth_space h gen).
+  available_space (nth_space h gen) - used_space (nth_space h gen).
 
 Definition enough_space_to_copy g h from to: Prop :=
   unmarked_gen_size g from <= rest_gen_size h to.
@@ -5767,7 +5767,7 @@ Proof.
 Qed.
 
 Lemma ti_size_spec_add: forall h sp i (Hs: 0 <= i < MAX_SPACES),
-    total_space sp = nth_gen_size (Z.to_nat i) -> ti_size_spec h ->
+    available_space sp = nth_gen_size (Z.to_nat i) -> ti_size_spec h ->
     ti_size_spec (add_new_space h sp i Hs).
 Proof.
   intros. unfold ti_size_spec in *. rewrite Forall_forall in *. intros.
@@ -5874,7 +5874,7 @@ Proof.
 Qed.
 
 Lemma gcc_add: forall g h gi sp i (Hs: 0 <= i < MAX_SPACES),
-    number_of_vertices gi = O -> total_space sp = nth_gen_size (Z.to_nat i) ->
+    number_of_vertices gi = O -> available_space sp = nth_gen_size (Z.to_nat i) ->
     garbage_collect_condition g h ->
     garbage_collect_condition (lgraph_add_new_gen g gi)
                               (add_new_space h sp i Hs).

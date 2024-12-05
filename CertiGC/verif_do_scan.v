@@ -116,7 +116,7 @@ Proof.
         forall b i,
           Vptr b i = space_start sp_to ->
           graph_rep g' * heap_rest_rep h' |--
-      !! (WORD_SIZE * total_space sp_to + Ptrofs.unsigned i <= Ptrofs.max_unsigned)) as Hf. {
+      !! (WORD_SIZE * available_space sp_to + Ptrofs.unsigned i <= Ptrofs.max_unsigned)) as Hf. {
       intros b i Hf. sep_apply (graph_and_heap_rest_data_at_ _ _ _ Hto Hghc').
       rewrite Hspto in Hf. sep_apply (generation_data_at__ptrofs g' h' to b i Hf).
       unfold gen_size; rewrite nth_space_Znth; entailer !!. }
@@ -142,7 +142,7 @@ Proof.
       sep_apply (graph_and_heap_rest_data_at_ _ _ _ Hto Hghc').
       unfold generation_data_at_. rewrite <- Hspto.
       rewrite data_at__memory_block. Intros. rewrite sizeof_tarray_int_or_ptr.
-      2: unfold gen_size; apply total_space_range.
+      2: unfold gen_size; apply available_space_range.
       remember (WORD_SIZE * used_space sp_to)%Z as used_offset.
       remember (to_index + n)%nat as index.
       remember (WORD_SIZE * previous_vertices_size g' to index)%Z as index_offset.

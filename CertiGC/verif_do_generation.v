@@ -63,12 +63,12 @@ Proof.
     remember (space_start (nth_space h from)) as from_p.
     remember (space_start (nth_space h to)) as to_p.
     remember (WORD_SIZE * used_space (nth_space h to))%Z as to_used.
-    remember (WORD_SIZE * total_space (nth_space h to))%Z as to_total.
+    remember (WORD_SIZE * available_space (nth_space h to))%Z as to_total.
     remember (WORD_SIZE * used_space (nth_space h from))%Z as from_used.
     destruct H0 as [? [? ?]].
     replace from_p with (gen_start g from) by
         (subst; unfold gen_start; rewrite if_true; assumption).
-    replace (offset_val (WORD_SIZE * total_space (nth_space h from))
+    replace (offset_val (WORD_SIZE * available_space (nth_space h from))
                         (gen_start g from)) with (limit_address g h from) by
         (unfold limit_address, gen_size; reflexivity).
     assert_PROP (isptr (space_address hp to)). {
@@ -99,7 +99,7 @@ Proof.
         (unfold space_struct_rep, space_tri; entailer!!).
     unlocalize [heap_rep sh h1 hp].
     1: apply heap_rep_ramif_stable_1; assumption. thaw FR. rewrite H24.
-    replace (offset_val (WORD_SIZE * total_space (nth_space h1 from))
+    replace (offset_val (WORD_SIZE * available_space (nth_space h1 from))
                         (gen_start g1 from)) with (limit_address g1 h1 from) by
         (unfold limit_address, gen_size; reflexivity).
     pose proof I.

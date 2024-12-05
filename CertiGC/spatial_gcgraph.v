@@ -36,7 +36,7 @@ Definition space_rest_rep (sp: space): mpred :=
   if (Val.eq sp.(space_start) nullval)
   then emp
   else data_at_ (space_sh sp)
-                (tarray int_or_ptr_type (sp.(total_space) - sp.(used_space)))
+                (tarray int_or_ptr_type (sp.(available_space) - sp.(used_space)))
                 (offset_val (WORD_SIZE * used_space sp) sp.(space_start)).
 
 Definition heap_rest_rep (hp: heap): mpred :=
@@ -44,8 +44,8 @@ Definition heap_rest_rep (hp: heap): mpred :=
 
 Definition space_tri (sp: space): (reptype space_type) :=
   let s := sp.(space_start) in (s, (offset_val (WORD_SIZE * sp.(used_space)) s,
-                                    (offset_val (WORD_SIZE * sp.(total_space)) s,
-                                     offset_val (WORD_SIZE * sp.(total_space)) s))).
+                                    (offset_val (WORD_SIZE * sp.(available_space)) s,
+                                     offset_val (WORD_SIZE * sp.(available_space)) s))).
 
 Definition heap_struct_rep (sh: share) (sp_reps: list (@reptype CompSpecs space_type)) (h: val):
   mpred := @data_at CompSpecs sh heap_type sp_reps h.
@@ -338,13 +338,13 @@ Proof.
   intros. apply derives_refl.
 Qed.
 
-  Definition heap_rep (sh: share) (h: heap) (p: val) :=
-    heap_struct_rep sh (map space_tri h.(spaces)) p * heap_rest_rep h.
+Definition heap_rep (sh: share) (h: heap) (p: val) :=
+  heap_struct_rep sh (map space_tri h.(spaces)) p * heap_rest_rep h.
 
-  Definition before_gc_thread_info_rep (sh: share) (ti: thread_info) (t: val) :=
+Definition before_gc_thread_info_rep (sh: share) (ti: thread_info) (t: val) :=
   let nursery := heap_head ti.(ti_heap) in
   let p := nursery.(space_start) in
-  let n_lim := offset_val (WORD_SIZE * nursery.(total_space)) p in
+  let n_lim := offset_val (WORD_SIZE * nursery.(available_space)) p in
   data_at sh thread_info_type
          (offset_val (WORD_SIZE * nursery.(used_space)) p,
            (n_lim, (ti.(ti_heap_p), (ti.(ti_args), (ti_fp ti, (Vptrofs (ti.(ti_nalloc)),nullval)))))) t *
@@ -847,7 +847,7 @@ Abort.
 Definition heap_rest_gen_data_at_ (g: LGraph) (h: heap) (gen: nat) :=
   data_at_ (nth_sh g gen)
            (tarray int_or_ptr_type
-                   (total_space (nth_space h gen) - graph_gen_size g gen))
+                   (available_space (nth_space h gen) - graph_gen_size g gen))
            (offset_val (WORD_SIZE * graph_gen_size g gen) (gen_start g gen)).
 
 Lemma heap_rest_rep_iter_sepcon: forall g h,
@@ -962,7 +962,7 @@ Proof.
                (nth_sh g gen)
                (tarray int_or_ptr_type (gen_size h gen)) (gen_start g gen)).
   simpl sizeof. rewrite Z.max_r by
-      (unfold gen_size; apply (proj1 (total_space_range (nth_space h gen)))).
+      (unfold gen_size; apply (proj1 (available_space_range (nth_space h gen)))).
   unfold gen_start. if_tac. 2: contradiction.
   rewrite H2. fold WORD_SIZE.
   sep_apply (memory_block_valid_ptr
@@ -982,7 +982,7 @@ Proof.
   intros. unfold generation_data_at_. rewrite <- H. entailer!.
   destruct H0 as [_ [_ [? _]]]. red in H0. simpl sizeof in H0. unfold WORD_SIZE.
   rewrite Z.max_r in H0; [rep_lia |
-                          unfold gen_size; apply (proj1 (total_space_range _))].
+                          unfold gen_size; apply (proj1 (available_space_range _))].
 Qed.
 
 Lemma outlier_rep_single_rep: forall outlier p,
@@ -1196,8 +1196,8 @@ Proof.
   unfold space_rest_rep. simpl. do 2 rewrite if_false by assumption.
   red in H2. subst P. remember (Znth i (spaces h)) as sp.
   rewrite (data_at__tarray_value _ _ _ _ H2). rewrite offset_offset_val.
-  replace (total_space sp - used_space sp - s) with
-      (total_space sp - (used_space sp + s)) by lia.
+  replace (available_space sp - used_space sp - s) with
+      (available_space sp - (used_space sp + s)) by lia.
   replace (WORD_SIZE * used_space sp + WORD_SIZE * s) with
       (WORD_SIZE * (used_space sp + s))%Z by rep_lia. reflexivity.
 Qed.
@@ -1815,13 +1815,13 @@ Proof.
   rewrite H5. simpl. remember (nth_space h gen).
   replace (WORD_SIZE * 0)%Z with 0 by lia.
   rewrite isptr_offset_val_zero by assumption.
-  replace (total_space s - 0) with (total_space s) by lia.
+  replace (available_space s - 0) with (available_space s) by lia.
   rewrite <- data_at__tarray_value by apply space_order. cancel.
 Qed.
 
 Definition space_token_rep (sp: space): mpred :=
   if Val.eq (space_start sp) nullval then emp
-  else malloc_token Ews (tarray int_or_ptr_type (total_space sp)) (space_start sp).
+  else malloc_token Ews (tarray int_or_ptr_type (available_space sp)) (space_start sp).
 
 Definition ti_token_rep (h: heap) (p: val): mpred :=
   malloc_token Ews heap_type p * iter_sepcon (spaces h) space_token_rep.
@@ -1840,7 +1840,7 @@ Qed.
 Lemma ti_token_rep_add: forall h p sp i (Hs: 0 <= i < MAX_SPACES),
     space_start (Znth i (spaces h)) = nullval ->
     space_start sp <> nullval ->
-    malloc_token Ews (tarray int_or_ptr_type (total_space sp)) (space_start sp) *
+    malloc_token Ews (tarray int_or_ptr_type (available_space sp)) (space_start sp) *
     ti_token_rep h p |-- ti_token_rep (add_new_space h sp i Hs) p.
 Proof.
   intros. unfold ti_token_rep. simpl. cancel. remember (spaces h).

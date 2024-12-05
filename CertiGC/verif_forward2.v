@@ -87,7 +87,7 @@ Proof.
     apply weak_derives_strong. subst. sep_apply (graph_and_heap_rest_data_at_ g h from).
     unfold generation_data_at_. rewrite data_at__memory_block, sizeof_tarray_int_or_ptr;
       [Intros; cancel | unfold gen_size].
-    destruct (total_space_tight_range (nth_space h from)). assumption. } subst vn.
+    destruct (available_space_tight_range (nth_space h from)). assumption. } subst vn.
   destruct (Znth n (make_fields g v)) as [z | gc | e] eqn:?; unfold field2val.
   (* Unboxed z | Outlier | Edge *)
   - (* Unboxed z *)

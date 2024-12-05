@@ -2,22 +2,22 @@ From CertiGraph.CertiGC Require Import env_graph_gc gc_spec.
 
 Local Open Scope logic.
 
-Lemma sem_sub_pp_total_space: forall s,
+Lemma sem_sub_pp_available_space: forall s,
     isptr (space_start s) ->
     force_val
       (sem_sub_pp int_or_ptr_type
-                  (offset_val (WORD_SIZE * total_space s) (space_start s))
+                  (offset_val (WORD_SIZE * available_space s) (space_start s))
                   (space_start s)) =
-    if Archi.ptr64 then Vlong (Int64.repr (total_space s)) else
-      Vint (Int.repr (total_space s)).
+    if Archi.ptr64 then Vlong (Int64.repr (available_space s)) else
+      Vint (Int.repr (available_space s)).
 Proof.
   intros. destruct (space_start s); try contradiction. simpl. destruct (eq_block b b).
   2: exfalso; apply n; reflexivity.
   unfold sem_sub_pp; destruct eq_block; [|easy].
   inv_int i. rewrite ptrofs_add_repr, ptrofs_sub_repr.
-  replace (ofs + WORD_SIZE * total_space s - ofs) with
-      (WORD_SIZE * total_space s)%Z by lia. simpl.
-  pose proof (total_space_signed_range s). unfold Ptrofs.divs.
+  replace (ofs + WORD_SIZE * available_space s - ofs) with
+      (WORD_SIZE * available_space s)%Z by lia. simpl.
+  pose proof (available_space_signed_range s). unfold Ptrofs.divs.
   rewrite !Ptrofs.signed_repr by rep_lia.
   rewrite Vptrofs_unfold_true, ptrofs_to_int64_repr by reflexivity.
   do 2 f_equal.
@@ -28,17 +28,17 @@ Lemma sem_sub_pp_rest_space: forall s,
     isptr (space_start s) ->
     force_val
       (sem_sub_pp int_or_ptr_type
-                  (offset_val (WORD_SIZE * total_space s) (space_start s))
+                  (offset_val (WORD_SIZE * available_space s) (space_start s))
                   (offset_val (WORD_SIZE * used_space s) (space_start s))) =
-    if Archi.ptr64 then Vlong (Int64.repr (total_space s - used_space s)) else
-      Vint (Int.repr (total_space s - used_space s)).
+    if Archi.ptr64 then Vlong (Int64.repr (available_space s - used_space s)) else
+      Vint (Int.repr (available_space s - used_space s)).
 Proof.
   intros. destruct (space_start s); try contradiction. simpl. destruct (eq_block b b).
   2: exfalso; apply n; reflexivity.
   inv_int i. unfold sem_sub_pp; destruct eq_block; [|easy].
   rewrite !ptrofs_add_repr, ptrofs_sub_repr.
-  replace (ofs + WORD_SIZE * total_space s - (ofs + WORD_SIZE * used_space s)) with
-          (WORD_SIZE * (total_space s - used_space s))%Z by
+  replace (ofs + WORD_SIZE * available_space s - (ofs + WORD_SIZE * used_space s)) with
+          (WORD_SIZE * (available_space s - used_space s))%Z by
       (rewrite Z.mul_sub_distr_l; lia). simpl.
   pose proof (rest_space_signed_range s). rewrite <- Z.mul_sub_distr_l in H0.
   rewrite Vptrofs_unfold_true by reflexivity.
@@ -198,7 +198,7 @@ Proof.
       change (Tpointer tvoid {| attr_volatile := false; attr_alignas := Some _ |})
         with int_or_ptr_type. remember (Znth i (spaces (ti_heap t_info'))).
       simpl in H18. subst s.
-      rewrite sem_sub_pp_total_space by assumption.
+      rewrite sem_sub_pp_available_space by assumption.
       pose proof H9. destruct H19 as [_ [_ [_ ?]]].
       pose proof (ti_size_gen _ _ _ (proj1 H8) H13 H19). unfold gen_size in H20.
       rewrite nth_space_Znth, Z2Nat.id in H20 by lia. simpl in H20. rewrite H20. clear H19 H20.
@@ -243,7 +243,7 @@ Proof.
         assert (new_gen_relation (Z.to_nat (i + 1)) g' g1). {
           subst g1. red. rewrite if_false by assumption. exists gi. split; auto. }
         gather_SEP (malloc_token Ews (tarray int_or_ptr_type (nth_gen_size (Z.to_nat (i + 1)))) p) (ti_token_rep (ti_heap t_info') (ti_heap_p t_info')).
-        assert (total_space sp = nth_gen_size (Z.to_nat (i + 1))) by
+        assert (available_space sp = nth_gen_size (Z.to_nat (i + 1))) by
             (subst sp; simpl; reflexivity). rewrite <- H29.
         assert (space_start sp = p) by (subst sp; simpl; reflexivity). rewrite <- H30.
         assert (space_start sp <> nullval) by
@@ -251,8 +251,8 @@ Proof.
         sep_apply (ti_token_rep_add (ti_heap t_info') (ti_heap_p t_info') sp (i + 1) H20); auto.
         replace (space_start sp,
                  (space_start sp,
-                  (offset_val (WORD_SIZE * total_space sp) (space_start sp),
-                   offset_val (WORD_SIZE * total_space sp) (space_start sp)))) with
+                  (offset_val (WORD_SIZE * available_space sp) (space_start sp),
+                   offset_val (WORD_SIZE * available_space sp) (space_start sp)))) with
             (space_tri sp) by
             (unfold space_tri; do 2 f_equal; subst sp; simpl;
              rewrite isptr_offset_val_zero by assumption; reflexivity).
@@ -424,13 +424,13 @@ Proof.
       * change (Tpointer tvoid
                          {| attr_volatile := false; attr_alignas := Some 2%N |})
           with int_or_ptr_type in H39.
-        rewrite sem_sub_pp_total_space, sem_sub_pp_rest_space in H40; auto.
+        rewrite sem_sub_pp_available_space, sem_sub_pp_rest_space in H40; auto.
         simpl in H40. apply typed_true_of_bool in H40. rewrite negb_true_iff in H40.
         match goal with
         | H : Int64.lt _ _ = false |- _ => apply lt64_repr_false in H
         | H : Int.lt _ _ = false |- _ => apply lt_repr_false in H
         end.
-        2: apply rest_space_repable_signed. 2: apply total_space_repable_signed.
+        2: apply rest_space_repable_signed. 2: apply available_space_repable_signed.
         assert (safe_to_copy_gen g2 (Z.to_nat i) (S (Z.to_nat i))). {
           red. destruct H27 as [? _]. destruct H36 as [_ [_ [_ ?]]].
           do 2 (erewrite <- ti_size_gen; eauto). rewrite <- H23 in *.

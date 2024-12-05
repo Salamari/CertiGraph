@@ -73,7 +73,7 @@ Proof.
     apply weak_derives_strong. subst. sep_apply Hgenat.
     rewrite data_at__memory_block.
     rewrite sizeof_tarray_int_or_ptr; [Intros; cancel | unfold gen_size].
-    destruct (total_space_tight_range (nth_space h from)). assumption. }
+    destruct (available_space_tight_range (nth_space h from)). assumption. }
   destruct extr as [z | gp | ev]; simpl exterior2val.
   - unfold odd_Z2val. forward_if. 1: contradiction.
     forward. Exists g h. simpl forward_p2forward_t.
